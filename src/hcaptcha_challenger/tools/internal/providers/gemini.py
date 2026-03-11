@@ -59,6 +59,8 @@ class GeminiProvider:
         else:
             self._models = model
         
+        logger.info(f"GeminiProvider initialized with models: {self._models}")
+        
         self._key_index = 0
         self._model_index = 0
         self._client: genai.Client | None = None
@@ -189,17 +191,26 @@ class GeminiProvider:
                     model=self.model, contents=contents, config=config
                 )
             )
-        except errors.ClientError as e:
-            # If 429 RESOURCE_EXHAUSTED, rotate key for the next retry
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+        except (errors.ClientError, TypeError) as e:
+            # Handle library bug where APIError fails to instantiate (missing response_json)
+            # or genuine ClientError (429, etc.)
+            is_masked_sdk_bug = isinstance(e, TypeError) and ("APIError.__init__" in str(e) or "response_json" in str(e))
+            
+            error_str = str(e)
+            
+            # If 429 RESOURCE_EXHAUSTED or masked SDK bug that usually implies an error response
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or is_masked_sdk_bug:
+                if is_masked_sdk_bug:
+                    LoggerHelper.log_warning("Detectado bug no SDK Gemini (APIError Masked). Tratando como falha de provedor.", emoji='bug')
+                
                 # Try to extract retry delay (cooldown)
                 retry_seconds = 0
                 try:
                     # Look for "retry in Xs" or "retryDelay: 'Xs'"
                     import re
-                    match = re.search(r"retry in (\d+\.?\d*)s", str(e))
+                    match = re.search(r"retry in (\d+\.?\d*)s", error_str)
                     if not match:
-                        match = re.search(r"retryDelay':\s*'(\d+)s'", str(e))
+                        match = re.search(r"retryDelay':\s*'(\d+)s'", error_str)
                     
                     if match:
                         retry_seconds = int(float(match.group(1))) + 1 # Add 1s buffer
@@ -215,11 +226,12 @@ class GeminiProvider:
                 
                 self.rotate_key()
             else:
-                # Track other client errors as potential instability
+                # Track other client errors or TypeErrors as potential instability
                 self._quota_manager.mark_failure(self._api_keys[self._key_index], self.model)
                 self.rotate_key()
             raise e
         except Exception as e:
+
             # Track unexpected errors as potential instability
             self._quota_manager.mark_failure(self._api_keys[self._key_index], self.model)
             self.rotate_key()
