@@ -165,10 +165,13 @@ class PilotChallenges:
                 # Soul Alignment: Instrução de alta precisão (Portado da linha 825)
                 ai_hint = (
                     f"{user_prompt}\n"
-                    "Instrução Crítica: Você é um especialista em precisão de pixels. "
-                    "Identifique a peça móvel (normalmente à direita) e o slot de destino exato no lado esquerdo. "
-                    "Forneça as coordenadas do CENTRO da peça e do CENTRO exato do encaixe. "
-                    "Double-check: O encaixe deve completar a geometria da imagem perfeitamente."
+                    "STEP-BY-STEP INSTRUCTIONS:\n"
+                    "1. The RIGHT side has draggable line segments stacked vertically.\n"
+                    "2. The LEFT side has incomplete lines with visible GAPS.\n"
+                    "3. Match each segment to its gap by ANGLE and CURVATURE continuity.\n"
+                    "4. FROM = center of draggable piece (right side, higher X). TO = center of gap (left side, lower X).\n"
+                    "5. Read all coordinates from the GRID AXIS LABELS, not pixel estimation.\n"
+                    "6. VALIDATION: start_point.x MUST be > end_point.x (right to left movement)."
                 )
                 
                 try:
@@ -214,6 +217,9 @@ class PilotChallenges:
             self.arm.metrics.log_ai_call(ai_duration)
 
             for path in response.paths:
+                # Validação: corrigir coordenadas invertidas (FROM deve ser à direita, TO à esquerda)
+                if path.start_point.x < path.end_point.x:
+                    path.start_point, path.end_point = path.end_point, path.start_point
                 if self.arm._validate_coordinate(path.start_point.x, path.start_point.y):
                     LoggerHelper.log_info(f"DRAG: ({int(path.start_point.x)}, {int(path.start_point.y)}) -> ({int(path.end_point.x)}, {int(path.end_point.y)})", emoji='drag')
                     await self.arm.actions.perform_drag_drop(path, delay_ms=random.randint(15, 25))
@@ -241,7 +247,8 @@ class PilotChallenges:
             real_prompt = self.arm.captcha_payload.get_requester_question().lower() if self.arm.captcha_payload else ""
             logger.info(f"DEBUG: Checking motion. Real Prompt: '{real_prompt}'")
             
-            is_motion = "motion" in real_prompt or "pattern" in real_prompt
+            motion_keywords = ["motion", "pattern", "move", "different", "fastest", "slowest", "differently"]
+            is_motion = any(k in real_prompt for k in motion_keywords)
             logger.info(f"DEBUG: is_motion={is_motion}")
             
             # Garantir que bbox seja definido antes

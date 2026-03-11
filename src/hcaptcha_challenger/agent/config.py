@@ -93,7 +93,7 @@ class AgentConfig(BaseSettings):
         description="When your local network is poor, increase this value appropriately [unit: second]",
     )
     RESPONSE_TIMEOUT: float = Field(
-        default=45,
+        default=60,
         description="When your local network is poor, increase this value appropriately [unit: second]",
     )
     RETRY_ON_FAILURE: bool = Field(
