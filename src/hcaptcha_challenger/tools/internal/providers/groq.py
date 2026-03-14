@@ -24,7 +24,7 @@ class GroqProvider:
     Groq-based chat provider implementation.
     """
 
-    def __init__(self, api_key: str | List[str], model: str | List[str] = "meta-llama/llama-4-maverick-17b-128e-instruct"):
+    def __init__(self, api_key: str | List[str], model: str | List[str] = "meta-llama/llama-4-scout-17b-16e-instruct"):
         """
         Initialize the Groq provider.
 
