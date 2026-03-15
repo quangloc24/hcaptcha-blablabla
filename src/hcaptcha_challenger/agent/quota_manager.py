@@ -64,7 +64,7 @@ class QuotaManager:
                     should_reset = True
             
             if should_reset:
-                logger.debug("Reiniciando quotas de chaves API (Reset Diário às 05:00 BRT / 08:00 UTC)")
+                logger.debug("Resetting API key quotas (Daily Reset at 05:00 BRT / 08:00 UTC)")
                 conn.execute("DELETE FROM quotas")
                 conn.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES ('last_reset', ?)", (now_utc.isoformat(),))
                 conn.commit()
@@ -99,11 +99,11 @@ class QuotaManager:
         return False
 
     def mark_exhausted(self, api_key: str, model: str):
-        """Marca uma chave como esgotada com backoff exponencial."""
+        """Marks a key as exhausted with exponential backoff."""
         key_id = self._generate_key_id(api_key, model)
         
         with self._get_connection() as conn:
-            # Obter contador atual
+            # Get current count
             cursor = conn.execute("SELECT backoff_count FROM quotas WHERE key_id = ?", (key_id,))
             row = cursor.fetchone()
             current_count = row[0] if row else 0
@@ -123,7 +123,7 @@ class QuotaManager:
             conn.commit()
             
         LoggerHelper.log_warning(
-            f"Chave [[highlight]{key_id}[/]] esgotada por {backoff_seconds}s (Tentativa {new_count})", 
+            f"Key [[highlight]{key_id}[/]] exhausted for {backoff_seconds}s (Attempt {new_count})", 
             emoji='💸'
         )
 
@@ -138,7 +138,7 @@ class QuotaManager:
                 ON CONFLICT(key_id) DO UPDATE SET temp_exhausted_until = excluded.temp_exhausted_until
             """, (key_id, until))
             conn.commit()
-        LoggerHelper.log_info(f"Chave [[highlight]{key_id}[/]] marcada como ESGOTAMENTO TEMPORÁRIO por [bold]{seconds}s[/]", emoji='hourglass')
+        LoggerHelper.log_info(f"Key [[highlight]{key_id}[/]] marked as TEMPORARY EXHAUSTION for [bold]{seconds}s[/]", emoji='hourglass')
 
     def mark_failure(self, api_key: str, model: str):
         """Track non-429 failures to detect unstable keys."""
@@ -158,13 +158,13 @@ class QuotaManager:
             cursor = conn.execute("SELECT failure_count FROM quotas WHERE key_id = ?", (key_id,))
             count = cursor.fetchone()[0]
             if count >= 3:
-                LoggerHelper.log_error(f"Chave [[highlight]{key_id}[/]] marcada como INSTÁVEL após {count} falhas", emoji='boom')
+                LoggerHelper.log_error(f"Key [[highlight]{key_id}[/]] marked as UNSTABLE after {count} failures", emoji='boom')
 
     def mark_success(self, api_key: str, model: str):
-        """Reseta falhas e reduz backoff após sucesso."""
+        """Resets failures and reduces backoff after success."""
         key_id = self._generate_key_id(api_key, model)
         with self._get_connection() as conn:
-            # Reduzir backoff count em 2 para recuperação rápida, mas gradual
+            # Reduce backoff count by 2 for fast but gradual recovery
             conn.execute("""
                 UPDATE quotas SET 
                     failure_count = 0,

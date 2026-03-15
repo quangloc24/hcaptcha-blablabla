@@ -27,8 +27,8 @@ class ImageCache:
 
 class RoboticArm:
     """
-    O Cockpit (Interface de Controle).
-    Centraliza todos os recursos e coordenadores.
+    The Cockpit (Control Interface).
+    Centralizes all resources and coordinators.
     """
     def __init__(self, page: Page, config):
         self.page = page
@@ -37,7 +37,7 @@ class RoboticArm:
         self.captcha_payload: Optional[CaptchaPayload] = None
         self.signal_crumb_count: Optional[int] = None
         
-        # Infraestrutura de recursos
+        # Resource infrastructure
         self.metrics = MetricsLogger()
         self._skill_manager = SkillManager(agent_config=config)
         self._image_cache = ImageCache()
@@ -52,7 +52,7 @@ class RoboticArm:
         self.core = PilotCore(page, self, config)
 
     def _init_reasoners(self):
-        """Inicializa os motores de IA baseados no provedor configurado."""
+        """Initializes AI engines based on the configured provider."""
         if self.config.AI_PROVIDER == "groq":
             from hcaptcha_challenger.tools.internal.providers.groq import GroqProvider
             groq_keys = [k.get_secret_value() if hasattr(k, "get_secret_value") else str(k) 
@@ -88,12 +88,12 @@ class RoboticArm:
 
     async def _get_available_model_and_keys(self, preferred_model: Optional[str] = None) -> Tuple[Optional[str], List[str]]:
         """
-        Retorna modelo e chaves não esgotadas baseado em prioridade.
-        Portado das linhas 75-90 do original.
+        Returns model and non-exhausted keys based on priority.
+        Ported from lines 75-90 of original.
         """
         api_keys = self.config.GEMINI_API_KEYS
         
-        # Prioridade de modelos (mais leves primeiro para garantir velocidade)
+        # Model priority (lighter first to ensure speed)
         model_priority = [
             "gemini-3.1-flash-lite-preview",
             "gemini-2.5-flash",
@@ -102,7 +102,7 @@ class RoboticArm:
         ]
 
         
-        # Se um modelo específico foi solicitado, usar ele
+        # If a specific model was requested, use it
         if preferred_model:
             model_priority = [preferred_model] + [m for m in model_priority if m != preferred_model]
         
@@ -124,8 +124,8 @@ class RoboticArm:
 
     def _match_user_prompt(self, job_type: ChallengeTypeEnum) -> str:
         """
-        Obtém o prompt específico do skill manager.
-        Portado das linhas 215-225 do original.
+        Gets the specific prompt from the skill manager.
+        Ported from lines 215-225 of original.
         """
         try:
             challenge_prompt = (
@@ -138,14 +138,14 @@ class RoboticArm:
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
-            logger.warning(f"Erro ao processar prompt do captcha: {e}")
+            logger.warning(f"Error processing captcha prompt: {e}")
 
         return f"Please note that the current task type is: {job_type.value}"
 
     async def _get_challenge_image(self, frame: Frame, cache_key: Path, cid: Union[int, str]) -> Optional[Path]:
         """
-        Captura a screenshot da área do desafio (3x3 grid).
-        Portado das linhas 320-340 do original.
+        Captures screenshot of the challenge area (3x3 grid).
+        Ported from lines 320-340 of original.
         """
         try:
             challenge_container = frame.locator("//div[contains(@class, 'challenge-container')]")
@@ -157,11 +157,11 @@ class RoboticArm:
             await challenge_container.screenshot(path=output_path, timeout=5000)
             return output_path
         except Exception as e:
-            LoggerHelper.log_error(f"Erro ao capturar imagem do desafio: {str(e)[:100]}")
+            LoggerHelper.log_error(f"Error capturing challenge image: {str(e)[:100]}")
             return None
 
     def get_skill_manager(self):
-        """Getter para o skill manager."""
+        """Getter for skill manager."""
         return self._skill_manager
 
     @property
@@ -181,7 +181,7 @@ class RoboticArm:
         return self._spatial_point_reasoner
 
     def _log_ai_response(self, response, current_round: int, total_rounds: int):
-        """Implementação da linha 130-160 do original: Log detalhado da resposta da IA."""
+        """Implementation of original lines 130-160: Detailed AI response log."""
         title = f"🧠 IA ROUND {current_round}/{total_rounds}"
         if not response: return
         
@@ -198,9 +198,9 @@ class RoboticArm:
                     msg = str(log_msg).strip()
                     # 1. Sequências de escape ANSI tradicionais
                     msg = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', msg)
-                    # 2. Resíduos de códigos de cores sem prefixo (ex: [32m, ;40m, 0m)
+                    # 2. Residues of color codes without prefix (e.g. [32m, ;40m, 0m)
                     msg = re.sub(r'\[?\d+(?:;\d+)*m', '', msg)
-                    # Remove caracteres de controle invisíveis
+                    # Remove invisible control characters
                     msg = "".join(ch for ch in msg if ord(ch) >= 32 or ch in "\n\r\t")
                     
                     if msg.startswith('{') or msg.startswith('['):
@@ -215,21 +215,21 @@ class RoboticArm:
                     else:
                         LoggerHelper.log_info(f"[{title}] {msg[:200]}...")
         except Exception as e:
-            LoggerHelper.log_debug(f"Falha ao formatar log da IA: {e}")
+            LoggerHelper.log_debug(f"Failed to format AI log: {e}")
             LoggerHelper.log_info(f"[{title}] {response}")
 
     def _validate_coordinate(self, x: int, y: int) -> bool:
         """Sanity check portado da linha 180 do original."""
         bbox = self.navigation.current_view_bbox
         if not bbox: 
-            LoggerHelper.log_warning(f"BBox não definido, coordenada ({x}, {y}) aceita.")
+            LoggerHelper.log_warning(f"BBox not defined, coordinate ({x}, {y}) accepted.")
             return True
         
         bx, by = bbox.get('x', 0), bbox.get('y', 0)
         bw, bh = bbox.get('width', 1000), bbox.get('height', 1000)
         
-        # Verificar se as coordenadas estão razoavelmente dentro da viewport
-        # Margem de 10% para permitir pequenos desvios
+        # Check if coordinates are reasonably within the viewport
+        # 10% margin to allow small deviations
         margin = 0.1
         min_x = bx - (bw * margin)
         max_x = bx + bw + (bw * margin)
@@ -240,25 +240,25 @@ class RoboticArm:
         
         if not is_valid:
             LoggerHelper.log_warning(
-                f"Coordenadas suspeitas: ({x}, {y}) fora dos limites normais "
+                f"Suspicious coordinates: ({x}, {y}) outside normal limits "
                 f"({int(min_x)}-{int(max_x)}, {int(min_y)}-{int(max_y)})"
             )
-            # Em vez de rejeitar, aplicar correção para dentro dos limites
-            return False # Fallback será acionado pelo PilotChallenges
+            # Instead of rejecting, apply correction within limits
+            return False # Fallback will be triggered by PilotChallenges
         
         return True
 
     def log_provider_error(self, current_key_index: int, total_keys: int, error: Exception):
         """
-        Log de erro de provedor de IA portado das linhas 95-120 do original.
+        AI provider error log ported from lines 95-120 of original.
         """
         error_msg = str(error).lower()
-        key_info = f"🔑 Chave {current_key_index}/{total_keys}"
+        key_info = f"🔑 Key {current_key_index}/{total_keys}"
         
         if "429" in error_msg or "quota" in error_msg or "exhausted" in error_msg:
-            LoggerHelper.log_error(f"{key_info}: Quota excedida", emoji='💸')
+            LoggerHelper.log_error(f"{key_info}: Quota exceeded", emoji='💸')
         elif "500" in error_msg or "internal" in error_msg:
-            LoggerHelper.log_error(f"{key_info}: Erro interno do servidor", emoji='🔄')
+            LoggerHelper.log_error(f"{key_info}: Internal server error", emoji='🔄')
         elif "timeout" in error_msg:
             LoggerHelper.log_warning(f"{key_info}: Timeout", emoji='⏰')
         else:
@@ -266,58 +266,58 @@ class RoboticArm:
 
     def log_failure_summary(self, duration: float, error: str, retry_count: int, total_retries: int):
         """
-        Resumo elegante de falha portado da funcionalidade premium original.
+        Elegant failure summary ported from original premium functionality.
         """
-        # REMOVER CÓDIGOS ANSI DO ERRO
+        # REMOVE ANSI CODES FROM ERROR
         import re
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
         clean_error = ansi_escape.sub('', error)
         
         summary_text = Text()
-        summary_text.append(f"⏱️  Duração: {duration:.1f}s\n", style="yellow")
-        summary_text.append(f"🔄 Tentativa: {retry_count}/{total_retries}\n", style="cyan")
-        summary_text.append(f"❌ Erro: {clean_error[:150]}", style="red")
+        summary_text.append(f"⏱️  Duration: {duration:.1f}s\n", style="yellow")
+        summary_text.append(f"🔄 Attempt: {retry_count}/{total_retries}\n", style="cyan")
+        summary_text.append(f"❌ Error: {clean_error[:150]}", style="red")
         
         console.print(
             Panel(
                 summary_text,
-                title="[bold red]Resumo da Falha[/]",
+                title="[bold red]Failure Summary[/]",
                 border_style="red",
                 box=box.ROUNDED
             )
         )
 
     async def check_challenge_type(self) -> Optional[Union[RequestType, ChallengeTypeEnum]]:
-        """Delega a detecção para o piloto de navegação - Bridge Pattern."""
+        """Delegates detection to navigation pilot - Bridge Pattern."""
         return await self.navigation.check_challenge_type()
 
     async def debug_find_captcha(self):
-        """Delega a busca de componentes para o piloto de desafios - Bridge Pattern."""
+        """Delegates component search to challenge pilot - Bridge Pattern."""
         return await self.challenges.debug_find_captcha()
 
     async def check_crumb_count(self):
-        """Delega para o piloto de navegação - Bridge Pattern."""
+        """Delegates to navigation pilot - Bridge Pattern."""
         return await self.navigation.check_crumb_count()
 
     async def wait_for_all_loaders_complete(self, frame: Frame):
-        """Delega para o piloto de navegação - Bridge Pattern."""
+        """Delegates to navigation pilot - Bridge Pattern."""
         return await self.navigation.wait_for_loaders(frame)
 
     async def capture_spatial_mapping(self, frame: Frame, cache_key: Path, cid: Union[int, str]):
-        """Delega para o piloto de navegação - Bridge Pattern."""
+        """Delegates to navigation pilot - Bridge Pattern."""
         return await self.navigation.capture_grid(frame, cache_key, cid)
 
     async def _perform_drag_drop(self, path, delay_ms: int = 15, steps: int = 40):
         """
-        Método legado para manter compatibilidade com o baseline original.
-        Delega para PilotActions.perform_drag_drop.
+        Legacy method for original baseline compatibility.
+        Delegates to PilotActions.perform_drag_drop.
         """
         return await self.actions.perform_drag_drop(path, delay_ms=delay_ms, steps=steps)
 
-    # Métodos de logging portados do original
+    # Logging methods ported from original
     def _log_state_change(self, from_state: str, to_state: str):
         LoggerHelper.log_info(
-            f"Estado: [yellow]{from_state}[/] → [green]{to_state}[/]",
+            f"State: [yellow]{from_state}[/] → [green]{to_state}[/]",
             emoji='flag'
         )
     

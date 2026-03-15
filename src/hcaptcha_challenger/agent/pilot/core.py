@@ -39,8 +39,8 @@ class PilotCore:
         self.image_cache = ImageCache()
         self.network_logger = NetworkLogger(interval_seconds=5.0)
         
-        # Soul Alignment: Evitar multiplicação de listeners em páginas reutilizadas (Singleton Browser)
-        # Portado da lógica de paridade: remove o handler anterior antes de registrar o novo
+        # Soul Alignment: Avoid multiplier listeners on reused pages (Singleton Browser)
+        # Ported from parity logic: removes previous handler before registering new one
         old_handler = getattr(self.page, "_h_handler", None)
         if old_handler:
             try:
@@ -56,13 +56,13 @@ class PilotCore:
         # 1. HSW Injection (Dual Context)
         if response.url.endswith("/hsw.js"):
             try:
-                LoggerHelper.log_info("Injetando script HSW (Dual Context)...", emoji='inject')
+                LoggerHelper.log_info("Injecting HSW script (Dual Context)...", emoji='inject')
                 hsw_text = await response.text()
                 await self.page.evaluate(hsw_text)
                 if response.frame: await response.frame.evaluate(hsw_text)
                 await self.page.add_init_script(hsw_text)
             except Exception as e:
-                logger.error(f"Erro ao injetar HSW: {e}")
+                logger.error(f"Error injecting HSW: {e}")
                 
         # 2. GetCaptcha Interception (Msgpack Support)
         elif "/getcaptcha/" in response.url:
@@ -78,7 +78,7 @@ class PilotCore:
                     raw_data = await response.body()
                     context = response.frame if response.frame else self.page
                     has_hsw = await context.evaluate("() => typeof hsw === 'function'")
-                    if not has_hsw: logger.warning("HSW ausente durante binário.")
+                    if not has_hsw: logger.warning("HSW missing during binary.")
                         
                     result = await context.evaluate("async (data) => { try { const res = await hsw(0, new Uint8Array(data)); return Array.from(res); } catch(e) { return null; } }", list(raw_data))
                     if result:
@@ -86,7 +86,7 @@ class PilotCore:
                         self.captcha_payload_queue.put_nowait(CaptchaPayload(**unpacked))
                     else: self.captcha_payload_queue.put_nowait(None)
             except Exception as e:
-                logger.error(f"Erro no processador de Captcha (Get): {e}")
+                logger.error(f"Error in Captcha processor (Get): {e}")
                 self.captcha_payload_queue.put_nowait(None)
                 
         # 3. CheckCaptcha Result
@@ -97,7 +97,7 @@ class PilotCore:
             except: pass
 
     async def review_challenge_type(self) -> Optional[Union[RequestType, ChallengeTypeEnum]]:
-        """Implementação da linha 1090-1140 do AgentV: Decodifica o payload e decide a missão."""
+        """Implementation of AgentV lines 1090-1140: Decodes payload and decides mission."""
         try:
             payload = await asyncio.wait_for(self.captcha_payload_queue.get(), timeout=30)
             if not payload: return None
@@ -105,27 +105,27 @@ class PilotCore:
             self.arm.captcha_payload = payload
             prompt = payload.get_requester_question().lower()
             
-            # Soul Alignment: Verificação de questões ignoradas (Portado da linha 1160)
+            # Soul Alignment: Check for ignored questions (Ported from line 1160)
             if self.config.ignore_request_questions:
                 for q in self.config.ignore_request_questions:
                     if q in prompt:
-                        LoggerHelper.log_warning(f"Ignorando desafio por questão proibida: '{q}'", emoji='skip')
+                        LoggerHelper.log_warning(f"Ignoring challenge due to forbidden question: '{q}'", emoji='skip')
                         await self.arm.navigation.refresh_challenge()
                         return None
 
             # Keyword Overrides (Soul Alignment: Refined to avoid leakage)
-            # Apenas substitui se o prompt for EXTREMAMENTE específico ou se o tipo original for ambíguo
-            drag_keywords = ["drag", "arraste", "puzzle", "segment", "arraste-o", "mova", "piece"]
+            # Only replaces if prompt is EXTREMELY specific or original type is ambiguous
+            drag_keywords = ["drag", "puzzle", "segment", "piece", "move"]
             
-            # Se já for um tipo de drag conhecido pela rede, não precisamos de override pro básico
+            # If already a known drug type by network, we don't need override for basic
             is_already_drag = payload.request_type in [RequestType.IMAGE_DRAG_DROP]
             
             if any(k in prompt for k in drag_keywords) or is_already_drag:
-                # Se detectado por palavra-chave mas o tipo é visualmente outro (ex: select), logar aviso
+                # If detected by keyword but type is visually another (e.g. select), log warning
                 if payload.request_type not in [RequestType.IMAGE_DRAG_DROP] and not is_already_drag:
-                    LoggerHelper.log_warning(f"Override agressivo detectado: '{prompt}' (Tipo real: {payload.request_type})", emoji='⚠️')
+                    LoggerHelper.log_warning(f"Aggressive override detected: '{prompt}' (Actual type: {payload.request_type})", emoji='⚠️')
                 
-                LoggerHelper.log_info(f"Roteamento: Arraste detectado: '{prompt}'", emoji='target')
+                LoggerHelper.log_info(f"Routing: Drag detected: '{prompt}'", emoji='target')
                 self.arm.crumb_count = len(payload.tasklist)
                 try: 
                     return ChallengeTypeEnum.IMAGE_DRAG_SINGLE if len(payload.tasklist[0].entities) == 1 else ChallengeTypeEnum.IMAGE_DRAG_MULTI
@@ -135,13 +135,13 @@ class PilotCore:
             # Motion/Video Detection (Soul Alignment: Video Motion Support)
             # CORREÇÃO: "Select" + "motion" = image_label_single_select
             if "select" in prompt and "motion" in prompt:
-                LoggerHelper.log_info(f"Detectado: Seleção de objeto com padrão de movimento: '{prompt}'", emoji='target')
+                LoggerHelper.log_info(f"Detected: Object selection with motion pattern: '{prompt}'", emoji='target')
                 self.arm.crumb_count = len(payload.tasklist)
                 return ChallengeTypeEnum.IMAGE_LABEL_SINGLE_SELECT
             
             video_keywords = ["video", "clip"]
             if any(k in prompt for k in video_keywords):
-                 LoggerHelper.log_info(f"Detectado: Desafio de vídeo (não suportado, tentando como imagem): '{prompt}'", emoji='⚠️')
+                 LoggerHelper.log_info(f"Detected: Video challenge (unsupported, trying as image): '{prompt}'", emoji='⚠️')
                  self.arm.crumb_count = 1
                  return ChallengeTypeEnum.IMAGE_LABEL_SINGLE_SELECT
                 
@@ -157,12 +157,12 @@ class PilotCore:
                     max_shapes = payload.request_config.max_shapes_per_image if payload.request_config else 1
                     return ChallengeTypeEnum.IMAGE_LABEL_SINGLE_SELECT if max_shapes == 1 else ChallengeTypeEnum.IMAGE_LABEL_MULTI_SELECT
 
-            # Fallback para roteamento visual delegado ao RoboticArm
+            # Fallback for visual routing delegated to RoboticArm
             return await self.arm.check_challenge_type()
         except: return None
 
     async def solve_captcha(self, ctype: Union[RequestType, ChallengeTypeEnum]):
-        """Implementação da linha 1150-1210 do AgentV: Delega para o especialista correto."""
+        """Implementation of AgentV lines 1150-1210: Delegates to correct specialist."""
         if ctype == RequestType.IMAGE_LABEL_BINARY:
             await self.arm.challenges.handle_binary()
         elif ctype in [ChallengeTypeEnum.IMAGE_DRAG_SINGLE, ChallengeTypeEnum.IMAGE_DRAG_MULTI]:
@@ -172,7 +172,7 @@ class PilotCore:
         return True
 
     def cache_validated_response(self, cr: CaptchaResponse):
-        """Implementação da linha 1055-1065 do AgentV: Salva o token de sucesso."""
+        """Implementation of AgentV lines 1055-1065: Saves success token."""
         if not cr.is_pass: return
         self.cr_list.append(cr)
         try:

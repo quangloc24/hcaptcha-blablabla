@@ -45,7 +45,7 @@ class NetworkLogger:
             reqs_per_sec = self.request_count / duration
             # Cleaner network log with no dim style or confusing ANSI sequences
             console.print(
-                f"📡 [cyan][NETWORK][/] [bold]{self.request_count}[/] requisições capturadas em [bold]{duration:.1f}s[/] ({reqs_per_sec:.1f} req/s)",
+                f"📡 [cyan][NETWORK][/] [bold]{self.request_count}[/] requests captured in [bold]{duration:.1f}s[/] ({reqs_per_sec:.1f} req/s)",
                 highlight=False
             )
             self.request_count = 0
@@ -57,7 +57,7 @@ class ChallengeTracker:
     def __init__(self):
         self.rounds: List[Dict[str, Any]] = []
         self.start_time = None
-        self.challenge_name = "Desafio"
+        self.challenge_name = "Challenge"
 
     def start_challenge(self, name: str):
         self.challenge_name = name
@@ -82,15 +82,15 @@ class ChallengeTracker:
         success_count = sum(1 for r in self.rounds if r['success'])
         success_rate = (success_count / len(self.rounds)) * 100
         
-        table = Table(title=f"📊 RESUMO: {self.challenge_name}", box=ROUNDED, border_style="magenta")
+        table = Table(title=f"📊 SUMMARY: {self.challenge_name}", box=ROUNDED, border_style="magenta")
         table.add_column("Round", style="cyan")
         table.add_column("Status", style="bold")
-        table.add_column("Tempo", style="white")
+        table.add_column("Time", style="white")
         table.add_column("IA", style="dim")
-        table.add_column("Pontos", style="white")
+        table.add_column("Points", style="white")
         
         for r in self.rounds:
-            status = "[green]✅ ROUND OK[/]" if r['success'] else "[red]❌ FALHA NO ROUND[/]"
+            status = "[green]✅ ROUND OK[/]" if r['success'] else "[red]❌ ROUND FAILURE[/]"
             table.add_row(
                 str(r['round']),
                 status,
@@ -165,27 +165,27 @@ class LoggerHelper:
 
     @staticmethod
     def log_provider_error(attempt: int, total: int, exception: Exception):
-        """Log de erro de provedor (Gemini/Groq) de forma limpa sem JSON verboso"""
+        """Log provider error (Gemini/Groq) in a clean way without verbose JSON"""
         error_msg = str(exception)
         
-        # Extrair mensagem principal se for um erro de quota/429
-        clean_msg = "Erro desconhecido"
+        # Extract main message if it's a quota/429 error
+        clean_msg = "Unknown error"
         if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-            clean_msg = "[bold red]Limite de Quota Excedido (429)[/]"
-            # Tentar extrair o tempo de espera
+            clean_msg = "[bold red]Quota Limit Exceeded (429)[/]"
+            # Try to extract the wait time
             import re
             match = re.search(r"retry in (\d+\.?\d*)s|retryDelay':\s*'(\d+)s'", error_msg)
             if match:
                 seconds = match.group(1) or match.group(2)
-                clean_msg += f" - Aguarde [yellow]{seconds}s[/]"
+                clean_msg += f" - Wait [yellow]{seconds}s[/]"
         elif "500" in error_msg:
-            clean_msg = "[bold yellow]Erro Interno do Servidor (500)[/] - Instabilidade temporária"
+            clean_msg = "[bold yellow]Internal Server Error (500)[/] - Temporary instability"
         else:
-            # Encurtar mensagens genéricas
+            # Shorten generic messages
             clean_msg = error_msg[:100] + "..." if len(error_msg) > 100 else error_msg
 
         LoggerHelper.log_warning(
-            f"Tentativa [bold]{attempt}/{total}[/] - {clean_msg}",
+            f"Attempt [bold]{attempt}/{total}[/] - {clean_msg}",
             emoji='warning'
         )
 
@@ -200,7 +200,7 @@ class LoggerHelper:
         """Prints a step progress message"""
         percentage = (step / total) * 100
         bar = "█" * int(percentage / 5) + "░" * (20 - int(percentage / 5))
-        console.print(f"[step]🔄 Progresso: {bar} {percentage:.0f}% (Round {step}/{total})[/] - [italic]{message}[/]")
+        console.print(f"[step]🔄 Progress: {bar} {percentage:.0f}% (Round {step}/{total})[/] - [italic]{message}[/]")
 
     @staticmethod
     def log_key_value(key: str, value: Any, emoji: str = None):
@@ -223,13 +223,13 @@ class LoggerHelper:
     @staticmethod
     def log_challenge_start(challenge_type: str, round_index: int, total_rounds: int, prompt: str = None, timeout: int = 60):
         """Log semântico para início de desafio com visual premium"""
-        content = f"🔀 [bold cyan]Tipo:[/] [yellow]{challenge_type}[/]\n"
+        content = f"🔀 [bold cyan]Type:[/] [yellow]{challenge_type}[/]\n"
         content += f"📝 [bold magenta]Prompt:[/] [italic cyan]\"{prompt[:80]}...\"[/]\n"
-        content += f"⏱️  [bold white]Tempo limite:[/] [green]{timeout}s[/]"
+        content += f"⏱️  [bold white]Timeout:[/] [green]{timeout}s[/]"
         
         console.print(Panel(
             content, 
-            title=f"🎯 TENTATIVA {round_index}/{total_rounds}", 
+            title=f"🎯 ATTEMPT {round_index}/{total_rounds}", 
             border_style="cyan", 
             box=ROUNDED,
             padding=(0, 2)
@@ -237,8 +237,8 @@ class LoggerHelper:
 
     @staticmethod
     def log_round_start(current: int, total: int):
-        """Log semântico para início de round"""
-        LoggerHelper.log_step(current, total, "Iniciando round")
+        """Semantic log for round start"""
+        LoggerHelper.log_step(current, total, "Starting round")
 
     @staticmethod
     def log_ai_performance(model: str, duration: float, points: int):
@@ -257,23 +257,23 @@ class LoggerHelper:
             speed_text = "Rápido"
             
         console.print(
-            f"  {speed_icon} [{status}]{speed_text} IA ({model}):[/] "
+            f"  {speed_icon} [{status}]{speed_text} AI ({model}):[/] "
             f"[bold]{duration:.2f}s[/] | "
-            f"[bold]Resultado:[/][cyan] {points} pontos encontrados[/]",
+            f"[bold]Result:[/][cyan] {points} points found[/]",
             highlight=False
         )
         
-        # Alertas de performance lenta solicitados pelo usuário
+        # Low performance alerts requested by user
         if duration > 15:
-            LoggerHelper.log_warning(f"IA lenta ({duration:.1f}s). Possíveis causas:", emoji='slow')
-            console.print("    • [dim]Rate limit da API ou quota excedida[/]")
-            console.print("    • [dim]Modelo sob alta carga (Busy)[/]")
-            console.print("    • [dim]Complexidade alta do desafio[/]")
-            LoggerHelper.log_info("Tentando otimizar próxima chamada...", emoji='refresh')
+            LoggerHelper.log_warning(f"Slow AI ({duration:.1f}s). Possible causes:", emoji='slow')
+            console.print("    • [dim]API Rate limit or quota exceeded[/]")
+            console.print("    • [dim]Model under high load (Busy)[/]")
+            console.print("    • [dim]High challenge complexity[/]")
+            LoggerHelper.log_info("Trying to optimize next call...", emoji='refresh')
 
     @staticmethod
     def log_mouse_action(action: str, x: int, y: int, element: str = None, duration: float = None):
-        """Log de ação do mouse aprimorado"""
+        """Enhanced mouse action log"""
         emoji = {
             "click": "🖱️",
             "move": "↗️",
@@ -283,24 +283,24 @@ class LoggerHelper:
         
         action_text = action.upper()
         coord_text = f"({x}, {y})"
-        elem_text = f" em [bold]{element}[/]" if element else ""
-        dur_text = f" em [yellow]{duration:.1f}s[/]" if duration else ""
+        elem_text = f" at [bold]{element}[/]" if element else ""
+        dur_text = f" in [yellow]{duration:.1f}s[/]" if duration else ""
         
         console.print(f"    {emoji} [dim]{action_text}:[/] {coord_text}{elem_text}{dur_text}", highlight=False)
 
     @staticmethod
     def log_failure_summary(duration: float, error: str, retry_count: int, total_retries: int = 3):
-        """Resumo visual após falha no desafio"""
-        action = "Recarregando desafio" if retry_count < total_retries else "Abortando"
+        """Visual summary after challenge failure"""
+        action = "Reloading challenge" if retry_count < total_retries else "Aborting"
         
-        content = f"⏱️  [bold white]Tempo gasto:[/] [yellow]{duration:.1f}s[/]\n"
-        content += f"🐛 [bold red]Erro:[/] [dim]{error[:100]}...[/]\n"
-        content += f"🔄 [bold magenta]Tentativa:[/] [white]{retry_count}/{total_retries}[/]\n"
-        content += f"🎯 [bold cyan]Ação:[/] [bold italic]{action}[/]"
+        content = f"⏱️  [bold white]Time spent:[/] [yellow]{duration:.1f}s[/]\n"
+        content += f"🐛 [bold red]Error:[/] [dim]{error[:100]}...[/]\n"
+        content += f"🔄 [bold magenta]Attempt:[/] [white]{retry_count}/{total_retries}[/]\n"
+        content += f"🎯 [bold cyan]Action:[/] [bold italic]{action}[/]"
         
         console.print(Panel(
             content, 
-            title="❌ FALHA NO DESAFIO", 
+            title="❌ CHALLENGE FAILURE", 
             border_style="red", 
             box=ROUNDED,
             padding=(0, 2)
@@ -323,9 +323,9 @@ class MetricsLogger:
         key = "success" if success else "failed"
         self.metrics["challenges"][key] += 1
         
-        status = "✅ SUCESSO" if success else "❌ FALHA"
+        status = "✅ SUCCESS" if success else "❌ FAILURE"
         color = "green" if success else "red"
-        console.print(f"[{color}][bold]{status}[/] em {duration:.2f}s[/]")
+        console.print(f"[{color}][bold]{status}[/] in {duration:.2f}s[/]")
 
     def log_ai_call(self, duration: float):
         self.metrics["ai_calls"]["total"] += 1
@@ -335,7 +335,7 @@ class MetricsLogger:
         self.metrics["errors"][error_type] = self.metrics["errors"].get(error_type, 0) + 1
 
     def print_summary(self):
-        """Imprime resumo da sessão com Rich Table"""
+        """Prints session summary with Rich Table"""
         duration = time.time() - self.start_time
         
         total_challenges = self.metrics["challenges"]["total"]
@@ -344,17 +344,17 @@ class MetricsLogger:
         total_ai = self.metrics["ai_calls"]["total"]
         avg_ai = (self.metrics["ai_calls"]["total_time"] / total_ai) if total_ai > 0 else 0
         
-        table = Table(title="📊 ESTATÍSTICAS DA SESSÃO", box=ROUNDED, border_style="magenta")
-        table.add_column("Métrica", style="cyan")
-        table.add_column("Valor", style="bold white")
+        table = Table(title="📊 SESSION STATISTICS", box=ROUNDED, border_style="magenta")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="bold white")
         
-        table.add_row("Tempo Total", f"{duration:.1f}s")
-        table.add_row("Desafios", f"{total_challenges} ({success_rate:.1f}% sucesso)")
-        table.add_row("Chamadas IA", f"{total_ai} (média: {avg_ai:.2f}s)")
+        table.add_row("Total Time", f"{duration:.1f}s")
+        table.add_row("Challenges", f"{total_challenges} ({success_rate:.1f}% success)")
+        table.add_row("AI Calls", f"{total_ai} (average: {avg_ai:.2f}s)")
         
         if self.metrics["errors"]:
             error_summary = ", ".join([f"{k}: {v}" for k, v in self.metrics["errors"].items()])
-            table.add_row("Erros", f"[red]{error_summary}[/]")
+            table.add_row("Errors", f"[red]{error_summary}[/]")
             
         console.print(table)
 
@@ -365,9 +365,9 @@ def log_method_call(emoji: str = None, color: str = 'blue'):
             instance = args[0] if args else None
             class_name = instance.__class__.__name__ if instance else 'Unknown'
             
-            # Log de entrada
+            # Input log
             LoggerHelper.log_info(
-                f"[bold {color}]{class_name}.{func.__name__}()[/] - Iniciando...",
+                f"[bold {color}]{class_name}.{func.__name__}()[/] - Starting...",
                 emoji=emoji or 'debug'
             )
             
@@ -376,18 +376,18 @@ def log_method_call(emoji: str = None, color: str = 'blue'):
                 result = await func(*args, **kwargs)
                 elapsed = time.time() - start_time
                 
-                # Log de sucesso
+                # Success log
                 LoggerHelper.log_success(
-                    f"[bold {color}]{class_name}.{func.__name__}()[/] - Concluído em {elapsed:.2f}s",
+                    f"[bold {color}]{class_name}.{func.__name__}()[/] - Completed in {elapsed:.2f}s",
                     emoji='success'
                 )
                 return result
             except Exception as e:
                 elapsed = time.time() - start_time
                 
-                # Log de erro
+                # Error log
                 LoggerHelper.log_error(
-                    f"[bold {color}]{class_name}.{func.__name__}()[/] - Falhou após {elapsed:.2f}s: {str(e)[:100]}",
+                    f"[bold {color}]{class_name}.{func.__name__}()[/] - Failed after {elapsed:.2f}s: {str(e)[:100]}",
                     emoji='error'
                 )
                 raise
@@ -395,21 +395,21 @@ def log_method_call(emoji: str = None, color: str = 'blue'):
     return decorator
 
 def log_captcha_payload(payload):
-    """Log formatado do payload do captcha"""
+    """Formatted log of captcha payload"""
     if not payload:
         return
     
-    table = Table(title="📦 PAYLOAD DO CAPTCHA", box=ROUNDED, border_style="blue")
-    table.add_column("Campo", style="bold cyan")
-    table.add_column("Valor", style="white")
+    table = Table(title="📦 CAPTCHA PAYLOAD", box=ROUNDED, border_style="blue")
+    table.add_column("Field", style="bold cyan")
+    table.add_column("Value", style="white")
     
-    table.add_row("Tipo", getattr(payload.request_type, 'value', str(payload.request_type)))
+    table.add_row("Type", getattr(payload.request_type, 'value', str(payload.request_type)))
     table.add_row("Prompt", f"{payload.get_requester_question()[:50]}...")
     table.add_row("Task ID", str(getattr(payload, 'key', 'N/A')))
     
     if hasattr(payload, 'request_config'):
         config = payload.request_config
         if hasattr(config, 'max_shapes_per_image'):
-            table.add_row("Máx formas", str(config.max_shapes_per_image))
+            table.add_row("Max shapes", str(config.max_shapes_per_image))
             
     console.print(table)

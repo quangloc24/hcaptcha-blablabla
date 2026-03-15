@@ -23,7 +23,7 @@ class PilotNavigation:
         self._challenge_selector = "//iframe[starts-with(@src,'https://newassets.hcaptcha.com/captcha/v1/') and contains(@src, 'frame=challenge')]"
 
     async def get_challenge_frame(self) -> Optional[Frame]:
-        # Busca robusta (Recursiva + Fallbacks de URL)
+        # Robust search (Recursive + URL Fallbacks)
         for attempt in range(20):
             candidate = self._find_frame_recursive(self.page.main_frame)
             if candidate:
@@ -31,7 +31,7 @@ class PilotNavigation:
                     if await candidate.locator("//div[@class='challenge-view']").is_visible(timeout=1000):
                         return candidate
             
-            # Fallback literal por URL
+            # Literal fallback by URL
             for frame in self.page.frames:
                 if "hcaptcha.com/captcha/v1/" in frame.url and "frame=challenge" in frame.url:
                     with suppress(Exception):
@@ -39,7 +39,7 @@ class PilotNavigation:
                             return frame
             
             if attempt % 5 == 0:
-                LoggerHelper.log_info(f"Procurando frame... Tentativa {attempt+1}/20")
+                LoggerHelper.log_info(f"Looking for frame... Attempt {attempt+1}/20")
             await asyncio.sleep(1)
         return None
 
@@ -53,7 +53,7 @@ class PilotNavigation:
         return None
 
     def validate_coordinate(self, x: int, y: int) -> bool:
-        """Sanity check to prevent clicking way outside. Margem de 20% para flexibilidade oficial."""
+        """Sanity check to prevent clicking way outside. 20% margin for official flexibility."""
         if not self.current_view_bbox:
             return True
         
@@ -63,11 +63,11 @@ class PilotNavigation:
         bh = self.current_view_bbox.get('height', 1000)
 
         if not (bx - bw * 0.5 <= x <= bx + bw * 1.5) or not (by - bh * 0.5 <= y <= by + bh * 1.5):
-             LoggerHelper.log_warning(f"Coordenadas suspeitas: ({x}, {y}) fora dos limites normais.")
+             LoggerHelper.log_warning(f"Suspicious coordinates: ({x}, {y}) outside normal limits.")
         return True
 
     async def wait_for_loaders(self, frame: Frame) -> bool:
-        """Implementação robusta da linha 240-260 do original."""
+        """Robust implementation of original lines 240-260."""
         await asyncio.sleep(self.config.WAIT_FOR_CHALLENGE_VIEW_TO_RENDER_MS / 1000)
         loading_indicators = frame.locator("//div[@class='loading-indicator']")
         count = await loading_indicators.count()
@@ -86,7 +86,7 @@ class PilotNavigation:
         return True
 
     async def capture_grid(self, frame: Frame, cache_key: Path, cid: Union[int, str]) -> Tuple[Optional[Path], Optional[Path]]:
-        """Implementação robusta com MutationObserver e suporte a Canvas."""
+        """Robust implementation with MutationObserver and Canvas support."""
         await frame.evaluate("""
             async () => {
                 const imgs = Array.from(document.querySelectorAll(".challenge-view img"));
@@ -143,13 +143,13 @@ class PilotNavigation:
         return screenshot_path, grid_path
 
     async def get_challenge_frame_locator(self) -> Optional[Frame]:
-        """Implementação otimizada: Busca exaustiva pelo frame de desafio sem esperas cegas."""
-        # Tenta uma espera curta inicial de forma não-bloqueante pesada
+        """Optimized implementation: Exhaustive search for challenge frame without blind waits."""
+        # Tries a short initial wait in a non-heavy blocking way
         try:
             await self.page.wait_for_selector("iframe[src*='hcaptcha.com/captcha/v1/']", timeout=2000)
         except Exception: pass
 
-        for attempt in range(30): # Mais tentativas, mas mais rápidas
+        for attempt in range(30): # More attempts, but faster
             candidate = self._find_frame_recursive(self.page.main_frame)
             if candidate:
                 with suppress(Exception):
@@ -157,7 +157,7 @@ class PilotNavigation:
                     if await candidate.locator("//div[@class='challenge-view']").is_visible(timeout=200):
                         return candidate
             
-            # Fallback por URL (mais rápido que recursão em alguns casos)
+            # Fallback by URL (faster than recursion in some cases)
             for frame in self.page.frames:
                 if "hcaptcha.com/captcha/v1/" in frame.url and "frame=challenge" in frame.url:
                     with suppress(Exception):
@@ -165,15 +165,15 @@ class PilotNavigation:
                             return frame
             
             if attempt % 10 == 0:
-                LoggerHelper.log_info(f"Procurando cockpit... {attempt+1}/30")
+                LoggerHelper.log_info(f"Looking for cockpit... {attempt+1}/30")
             
-            # Sleep menor (250ms em vez de 1s) para ser mais responsivo
+            # Shorter sleep (250ms instead of 1s) to be more responsive
             await asyncio.sleep(0.25)
         return None
 
 
     async def check_crumb_count(self) -> int:
-        """Implementação da linha 245-250 do original: Conta as bolinhas do desafio."""
+        """Implementation of original lines 245-250: Counts challenge crumbs."""
         frame = await self.get_challenge_frame_locator()
         if not frame: return 1
         try:
@@ -181,7 +181,7 @@ class PilotNavigation:
         except: return 1
 
     async def check_challenge_type(self) -> Optional[Union[RequestType, ChallengeTypeEnum]]:
-        """Implementação da linha 255-280 do original: Detecta o tipo de desafio por roteamento visual."""
+        """Implementation of original lines 255-280: Detects challenge type via visual routing."""
         frame = await self.get_challenge_frame_locator()
         if not frame: return None
         
@@ -189,7 +189,7 @@ class PilotNavigation:
         count = await samples.count()
         if count == 9: return RequestType.IMAGE_LABEL_BINARY
         
-        # Roteamento Visual via IA (ChallengeRouter)
+        # Visual Routing via AI (ChallengeRouter)
         challenge_view = frame.locator("//div[@class='challenge-view']")
         cache_path = self.config.cache_dir.joinpath(f"challenge_view/_artifacts/{uuid.uuid4()}.png")
         cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -199,7 +199,7 @@ class PilotNavigation:
         return router_result.challenge_type
 
     async def refresh_challenge(self):
-        """Implementação da linha 235 do original: Recarrega o desafio."""
+        """Implementation of original line 235: Reloads the challenge."""
         frame = await self.get_challenge_frame_locator()
         if frame:
             refresh_button = frame.locator("//div[@class='refresh button']")
@@ -212,5 +212,5 @@ class PilotNavigation:
         return True
 
     async def click_checkbox(self):
-        """Redirecionar para PilotActions."""
+        """Redirect to PilotActions."""
         return await self.arm.actions.click_checkbox()

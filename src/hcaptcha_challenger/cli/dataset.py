@@ -65,7 +65,7 @@ def dataset_callback(ctx: typer.Context):
 
 async def _create_and_monitor_progress(collector: Collector, max_loops: int):
     """Create and monitor a progress bar for the collector"""
-    # 首先启动一个异步任务来准备收集器
+    # First launch an asynchronous task to prepare the collector
     collection_task = None
 
     try:

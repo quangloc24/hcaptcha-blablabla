@@ -373,18 +373,18 @@ def check_dataset(captcha_path: Path):
     cp = CaptchaPayload.model_validate_json(captcha_path.read_bytes())
     root = captcha_path.parent
 
-    # 确定信号面包屑数量
+    # Determine signal crumb count
     signal_crumb_count = len(cp.tasklist)
     if cp.request_type == RequestType.IMAGE_LABEL_BINARY:
         signal_crumb_count = int(len(cp.tasklist) / 9)
 
-    # 验证challenge_view数量
+    # Verify challenge_view quantity
     cv_paths = list(root.glob("*_challenge_view.png"))
     _verify_file_count(
         actual=len(cv_paths), expected=signal_crumb_count, file_type="challenge_view"
     )
 
-    # 根据请求类型验证不同文件
+    # Verify different files based on request type
     if cp.request_type == RequestType.IMAGE_LABEL_BINARY:
         _verify_file_count(
             actual=len(list(root.glob("*_task.png"))), expected=len(cp.tasklist), file_type="task"
@@ -396,7 +396,7 @@ def check_dataset(captcha_path: Path):
             file_type="canvas",
         )
 
-        # 仅对DRAG_DROP类型验证entity数量
+        # Only verify entity quantity for DRAG_DROP type
         if cp.request_type == RequestType.IMAGE_DRAG_DROP:
             for i, task in enumerate(cp.tasklist):
                 _verify_file_count(
@@ -407,6 +407,6 @@ def check_dataset(captcha_path: Path):
 
 
 def _verify_file_count(actual: int, expected: int, file_type: str):
-    """验证文件数量是否符合预期"""
+    """Verify file count matches expectation"""
     if actual != expected:
         raise ValueError(f"{file_type} quantity is inaccurate")

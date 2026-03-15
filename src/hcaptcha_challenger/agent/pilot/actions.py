@@ -18,7 +18,7 @@ class PilotActions:
         else:
             x, y = coords
 
-        # Jitter sutil para humanização (Premium Parity)
+        # Subtle jitter for humanization (Premium Parity)
         jx = x + random.uniform(-2, 2)
         jy = y + random.uniform(-2, 2)
         
@@ -26,9 +26,9 @@ class PilotActions:
         await self.page.mouse.click(jx, jy, delay=random.randint(150, 250))
 
     async def perform_drag_drop(self, path, delay_ms: int = 15, steps: int = 25):
-        # Validação de integridade do objeto path (Portabilidade Final)
+        # Integrity validation for path object (Final Portability)
         if not hasattr(path, 'start_point') or not hasattr(path, 'end_point'):
-            raise ValueError("O objeto Path deve ter os atributos start_point e end_point")
+            raise ValueError("The Path object must have start_point and end_point attributes")
             
         start_x, start_y = path.start_point.x, path.start_point.y
         end_x, end_y = path.end_point.x, path.end_point.y
@@ -42,7 +42,7 @@ class PilotActions:
         # Press the mouse button down
         await self.page.mouse.down()
         
-        # Soul Alignment: Official Bezier trajectory (Portado da linha 553 do original)
+        # Soul Alignment: Official Bezier trajectory (Ported from line 553 of original)
         points = _generate_bezier_trajectory((start_x, start_y), (end_x, end_y), steps)
         # Add velocity variation (slow start, fast middle, slow end)
         delays = _generate_dynamic_delays(steps, base_delay=delay_ms)
@@ -72,7 +72,7 @@ class PilotActions:
         await asyncio.sleep(random.uniform(0.08, 0.12))
 
     async def click_checkbox(self):
-        """Localiza e clica no checkbox inicial (Portado do baseline)."""
+        """Locates and clicks the initial checkbox (Ported from baseline)."""
         checkbox_selector = "//iframe[starts-with(@src,'https://newassets.hcaptcha.com/captcha/v1/') and contains(@src, 'frame=checkbox')]"
         checkbox_frame = self.page.frame_locator(checkbox_selector)
         checkbox_element = checkbox_frame.locator("//div[@id='checkbox']")

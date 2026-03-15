@@ -20,7 +20,7 @@ class PilotChallenges:
         return self.tracker
 
     async def _wait_for_all_loaders_complete(self, frame: Frame):
-        """Implementação da linha 240-260 do original: Garante que as imagens do desafio carregaram."""
+        """Implementation of lines 240-260 of the original: Ensures challenge images are loaded."""
         await asyncio.sleep(self.arm.config.WAIT_FOR_CHALLENGE_VIEW_TO_RENDER_MS / 1000)
         loading_indicators = frame.locator("//div[@class='loading-indicator']")
         count = await loading_indicators.count()
@@ -34,7 +34,7 @@ class PilotChallenges:
 
     async def _capture_burst_frames(self, frame: FrameLocator | Frame, cache_key: Path, cid: int, count: int = 3) -> list[Path]:
         """
-        Captura uma sequência de screenshots para desafios de movimento.
+        Captures a sequence of screenshots for motion challenges.
         """
         screenshots = []
         challenge_view = frame.locator("//div[@class='challenge-view']")
@@ -45,12 +45,12 @@ class PilotChallenges:
             await challenge_view.screenshot(type="png", path=path)
             screenshots.append(path)
             if i < count - 1:
-                await asyncio.sleep(0.2) # 200ms entre frames
+                await asyncio.sleep(0.2) # 200ms between frames
         
         return screenshots
 
     async def _capture_spatial_mapping(self, frame: Frame, cache_key: Path, cid: Union[int, str]) -> Tuple[Optional[Path], Optional[Path]]:
-        """Implementação robusta da linha 270-340: Captura screenshot com MutationObserver e suporte a Canvas."""
+        """Robust implementation of lines 270-340: Captures screenshot with MutationObserver and Canvas support."""
         await frame.evaluate("""
             async () => {
                 const imgs = Array.from(document.querySelectorAll(".challenge-view img"));
@@ -107,7 +107,7 @@ class PilotChallenges:
         return screenshot_path, grid_path
 
     async def _click_submit(self, frame):
-        """Implementação da linha 980 do original: Clica no botão submit com simulação humana."""
+        """Implementation of original line 980: Clicks submit button with human simulation."""
         selectors = [
             "//div[@class='button-submit button']",
             "//div[contains(@class, 'button-submit')]",
@@ -127,10 +127,10 @@ class PilotChallenges:
                     with suppress(Exception):
                         error_locator = frame.locator("//div[contains(@class, 'error-text')]")
                         if await error_locator.is_visible(timeout=1000):
-                            LoggerHelper.log_error("hCaptcha recusou solução!", emoji='boom')
+                            LoggerHelper.log_error("hCaptcha rejected solution!", emoji='boom')
                             return False
                     
-                    LoggerHelper.log_info("Ação enviada. Aguardando veredito...", emoji='hourglass')
+                    LoggerHelper.log_info("Action sent. Waiting for verdict...", emoji='hourglass')
                     return True
             except: continue
         return False
@@ -153,7 +153,7 @@ class PilotChallenges:
             
             img_hash = self.arm.core.image_cache.get_hash(raw)
             if img_hash and img_hash in self.arm.core.image_cache.cache:
-                LoggerHelper.log_info("Usando Cache (HIT 🎯)", emoji='kermit')
+                LoggerHelper.log_info("Using Cache (HIT 🎯)", emoji='kermit')
                 response = self.arm.core.image_cache.cache[img_hash]
                 ai_duration = 0
                 model_used = "cache"
@@ -162,7 +162,7 @@ class PilotChallenges:
                     preferred_model=self.arm.config.SPATIAL_PATH_REASONER_MODEL
                 )
                 
-                # Soul Alignment: Instrução de alta precisão (Portado da linha 825)
+                # Soul Alignment: High precision instruction (Ported from line 825)
                 ai_hint = (
                     f"{user_prompt}\n"
                     "STEP-BY-STEP INSTRUCTIONS:\n"
@@ -185,12 +185,12 @@ class PilotChallenges:
                     model_used = model
                     if img_hash: self.arm.core.image_cache.cache[img_hash] = response
                     
-                    # Feedback de quota: Sucesso
+                    # Quota feedback: Success
                     if model and available_keys:
                         k0 = available_keys[0]
                         self.arm.core.quota_manager.mark_success(k0, model)
                 except Exception as e:
-                    # Feedback de quota: Erro (Portabilidade Premium)
+                    # Quota feedback: Error (Premium Portability)
                     total_keys = len(self.arm.config.GEMINI_API_KEYS) if self.arm.config.GEMINI_API_KEYS else 1
                     current_key_idx = 1
                     
@@ -202,7 +202,7 @@ class PilotChallenges:
                         else:
                             self.arm.core.quota_manager.mark_failure(k0, model)
                         
-                        # Tentar encontrar o índice real no config original
+                        # Try to find real index in original config
                         for i, key_obj in enumerate(self.arm.config.GEMINI_API_KEYS):
                             val = key_obj.get_secret_value() if hasattr(key_obj, "get_secret_value") else str(key_obj)
                             if val == k0:
@@ -217,7 +217,7 @@ class PilotChallenges:
             self.arm.metrics.log_ai_call(ai_duration)
 
             for path in response.paths:
-                # Validação: corrigir coordenadas invertidas (FROM deve ser à direita, TO à esquerda)
+                # Validation: fix inverted coordinates (FROM should be right, TO left)
                 if path.start_point.x < path.end_point.x:
                     path.start_point, path.end_point = path.end_point, path.start_point
                 if self.arm._validate_coordinate(path.start_point.x, path.start_point.y):
@@ -243,7 +243,7 @@ class PilotChallenges:
             
             await self._wait_for_all_loaders_complete(frame)
 
-            # Soul Alignment: Detecção de Motion Pattern -> Burst Mode 📸
+            # Soul Alignment: Motion Pattern Detection -> Burst Mode 📸
             real_prompt = self.arm.captcha_payload.get_requester_question().lower() if self.arm.captcha_payload else ""
             logger.info(f"DEBUG: Checking motion. Real Prompt: '{real_prompt}'")
             
@@ -251,21 +251,21 @@ class PilotChallenges:
             is_motion = any(k in real_prompt for k in motion_keywords)
             logger.info(f"DEBUG: is_motion={is_motion}")
             
-            # Garantir que bbox seja definido antes
+            # Ensure bbox is defined beforehand
             bbox = await frame.locator("//div[@class='challenge-view']").bounding_box()
             self.arm.navigation.current_view_bbox = bbox
 
             if is_motion:
-                LoggerHelper.log_info("Desafio de Movimento detectado! Ativando Burst Mode (3 frames)...", emoji='📸')
+                LoggerHelper.log_info("Motion Challenge detected! Activating Burst Mode (3 frames)...", emoji='📸')
                 challenge_screenshots = await self._capture_burst_frames(frame, cache_key, cid, count=3)
                 
-                # Para grid, usamos o último frame do burst (bbox já definido acima)
+                # For grid, we use the last frame of the burst (bbox already defined above)
                 
                 from hcaptcha_challenger.helper import create_coordinate_grid
                 import matplotlib.pyplot as plt
                 
                 grid_result = create_coordinate_grid(
-                    challenge_screenshots[-1], # Usa o último frame para o grid
+                    challenge_screenshots[-1], # Uses last frame for the grid
                     bbox,
 
                     x_line_space_num=self.arm.config.coordinate_grid.x_line_space_num,
@@ -277,8 +277,8 @@ class PilotChallenges:
                 projection.parent.mkdir(parents=True, exist_ok=True)
                 plt.imsave(str(projection.resolve()), grid_result)
                 
-                raw = challenge_screenshots # Passa a LISTA de paths
-                LoggerHelper.log_info(f"Burst Mode concluído: {len(raw)} frames capturados.", emoji='🎞️')
+                raw = challenge_screenshots # Pass the LIST of paths
+                LoggerHelper.log_info(f"Burst Mode completed: {len(raw)} frames captured.", emoji='🎞️')
             else:
                 raw, projection = await self._capture_spatial_mapping(frame, cache_key, cid)
             
@@ -325,9 +325,9 @@ class PilotChallenges:
             self.arm.metrics.log_ai_call(ai_duration)
 
             for point in points:
-                # SOUL ALIGNMENT: O SpatialPointReasoner retorna coordenadas GLOBAIS
-                # A imagem grid_divisions contém labels de coordenadas absolutas
-                # Portanto, NÃO adicionamos offset aqui (como na linha 674 do original)
+                # SOUL ALIGNMENT: SpatialPointReasoner returns GLOBAL coordinates
+                # The grid_divisions image contains absolute coordinate labels
+                # Therefore, we do NOT add offset here (as in line 674 of the original)
                 await self.arm.page.mouse.click(point.x, point.y, delay=180)
                 await asyncio.sleep(random.uniform(0.4, 0.6))
 
@@ -400,54 +400,54 @@ class PilotChallenges:
 
     async def debug_find_captcha(self):
         """
-        Implementação da linha 345 original: Tenta encontrar componentes do captcha para debug.
-        Sistema "Swiss Army Knife" para detecção e ativação.
+        Implementation of original line 345: Tries to find captcha components for debugging.
+        "Swiss Army Knife" system for detection and activation.
         """
         page = self.arm.page
-        LoggerHelper.log_info("Procurando captcha na página...", emoji='🔍')
+        LoggerHelper.log_info("Looking for captcha on page...", emoji='🔍')
         
-        # 1. Tentar encontrar o Cockpit (Challenge Frame) diretamente primeiro
+        # 1. Try to find the Cockpit (Challenge Frame) directly first
         frame = await self.arm.navigation.get_challenge_frame_locator()
         if frame:
-            LoggerHelper.log_success(f"Cockpit encontrado: {frame.url[:60]}...", emoji='🎯')
+            LoggerHelper.log_success(f"Cockpit found: {frame.url[:60]}...", emoji='🎯')
             return True
             
-        # 2. Varredura exaustiva de iframes (Parity Restoration)
+        # 2. Exhaustive iframe scan (Parity Restoration)
         iframes = await page.query_selector_all('iframe')
-        LoggerHelper.log_info(f"Total de iframes detectados: {len(iframes)}", emoji='📋')
+        LoggerHelper.log_info(f"Total iframes detected: {len(iframes)}", emoji='📋')
         
         for i, iframe in enumerate(iframes):
             try:
                 src = await iframe.get_attribute('src') or ''
                 if 'hcaptcha' in src.lower() or 'captcha' in src.lower():
-                    LoggerHelper.log_success(f"Iframe {i} POSSÍVEL CAPTCHA: {src[:60]}...", emoji='🎯')
+                    LoggerHelper.log_success(f"Iframe {i} POSSIBLE CAPTCHA: {src[:60]}...", emoji='🎯')
                     
                     content_frame = await iframe.content_frame()
                     if content_frame:
-                        # Verificar Checkbox
+                        # Check Checkbox
                         checkbox = content_frame.locator('div#checkbox')
                         if await checkbox.is_visible(timeout=1000):
-                            LoggerHelper.log_success("Checkbox hCaptcha visível! Clicando...", emoji='✅')
+                            LoggerHelper.log_success("hCaptcha Checkbox visible! Clicking...", emoji='✅')
                             await self.arm.actions.click_by_mouse(checkbox)
-                            await asyncio.sleep(2) # Aguarda transição
+                            await asyncio.sleep(2) # Wait for transition
                             return True
             except:
                 continue
 
-        # 3. Verificar por seletores de dados (data-sitekey, etc)
+        # 3. Check for data selectors (data-sitekey, etc)
         selectors = [
             'div[class*="h-captcha"]', 'div[class*="hcaptcha"]', 
             'div[data-sitekey]', 'div#h-captcha', '.h-captcha'
         ]
         for selector in selectors:
             if await page.locator(selector).count() > 0:
-                LoggerHelper.log_success(f"Elemento captcha detectado via seletor: {selector}", emoji='🎯')
-                # Tenta clicar no checkbox se encontrar
+                LoggerHelper.log_success(f"Captcha element detected via selector: {selector}", emoji='🎯')
+                # Try to click checkbox if found
                 try: 
                     await self.arm.actions.click_checkbox() 
                     return True
                 except: pass
                 return True
 
-        LoggerHelper.log_warning("Cockpit não localizado.")
+        LoggerHelper.log_warning("Cockpit not located.")
         return False
