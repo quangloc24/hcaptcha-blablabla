@@ -171,19 +171,12 @@ class PilotChallenges:
                 else:
                     LoggerHelper.log_info("Using default global prompt", emoji='📝')
                 
-                # Soul Alignment: High precision instruction (Ported from line 825)
+                # Soul Alignment: Dynamic Hinting based on challenge type
                 ai_hint = (
                     f"{user_prompt}\n"
-                    "STEP-BY-STEP INSTRUCTIONS:\n"
-                    "1. INVENTORY LOCKDOWN: Count draggable elements on the RIGHT. Return EXACTLY that many paths.\n"
-                    "2. NO UI ELEMENTS: Ignore 'Move' buttons, labels, and numbers as candidates.\n"
-                    "3. CHROMATIC & NUMERIC LOCK: Match pieces to neighbors by color and number. Segment '2' connects to piece '3', which connects to segment '4'.\n"
-                    "4. CHRONOLOGICAL ORDERING: If multiple pieces are numbered, identify the sequence (e.g. 1, 2, 3) and place them in that exact order on the grid from the CHARACTER (Start) to the EXIT (End).\n"
-                    "5. GEOMETRIC MATCH: Align notches/bumps for a perfect unit.\n"
-                    "6. VERTICAL SEAMING: If gaps connect different Y-levels, target the geometric mid-point between the two road rows.\n"
-                    "7. FROM = center of piece (Higher X). TO = center of target slot (Lower X).\n"
-                    "8. GRID ACCURACY: Use the AXIS LABELS to target the geometric center.\n"
-                    "9. VALIDATION: start_point.x MUST be > end_point.x."
+                    "INVENTORY LOCKDOWN: Count draggable elements on the RIGHT. Return EXACTLY that many paths.\n"
+                    "NO UI ELEMENTS: Ignore 'Move' buttons, labels, and numbers as candidates.\n"
+                    "VALIDATION: start_point.x MUST be > end_point.x."
                 )
                 
                 try:
@@ -244,31 +237,43 @@ class PilotChallenges:
     def _detect_drag_challenge_type(self, user_prompt: str) -> str | None:
         """
         Detect the specific drag challenge type from the user prompt.
-        
-        Args:
-            user_prompt: The challenge prompt text
-            
-        Returns:
-            The specific drag type identifier or None for default prompt
+        Optimized for Soul Alignment (Penguins, Roads, Halves, Connections).
         """
         prompt_lower = user_prompt.lower() if user_prompt else ""
         
-        # Check for specific drag challenge patterns
-        if "similar" in prompt_lower:
-            LoggerHelper.log_info("Detected drag type: drag_similar (finding similar shapes)", emoji='🎯')
-            return "drag_similar"
-        elif "shadow" in prompt_lower or "pattern that match" in prompt_lower:
-            LoggerHelper.log_info("Detected drag type: drag_shadow (matching object to shadow)", emoji='🎯')
-            return "drag_shadow"
-        elif "pair" in prompt_lower:
-            LoggerHelper.log_info("Detected drag type: drag_pairs (completing pairs)", emoji='🎯')
-            return "drag_pairs"
-        elif "connect" in prompt_lower or "tree" in prompt_lower:
-            LoggerHelper.log_info("Detected drag type: drag_connection (color-based connection)", emoji='🎯')
+        # 1. drag_road: The "Penguin" / Road Completion case
+        # Keywords: complete the line, segments, road, path
+        if any(k in prompt_lower for k in ["line", "road", "segment", "path"]):
+            LoggerHelper.log_info("Detected drag type: drag_road (Road Reconstruction)", emoji='🐧')
+            return "drag_road"
+        
+        # 2. drag_connection: Trace the Circuit / Color paths
+        if any(k in prompt_lower for k in ["connect", "tree", "circuit"]):
+            LoggerHelper.log_info("Detected drag type: drag_connection (Color-based connection)", emoji='🎯')
             return "drag_connection"
         
-        # No specific type detected, use default prompt
-        LoggerHelper.log_info("Using default drag prompt (no specific type detected)", emoji='📋')
+        # 3. drag_halves: Complementary Shapes / Completing the unit
+        if any(k in prompt_lower for k in ["half", "shape", "complete the", "complementary"]):
+            LoggerHelper.log_info("Detected drag type: drag_halves (Geometric Matching)", emoji='🧩')
+            return "drag_halves"
+        
+        # 4. drag_shadow: Shadow matching
+        if "shadow" in prompt_lower or "pattern that match" in prompt_lower:
+            LoggerHelper.log_info("Detected drag type: drag_shadow (Shadow matching)", emoji='🌑')
+            return "drag_shadow"
+        
+        # 5. drag_fit: Generic fitting
+        if "fits" in prompt_lower or "place where it fit" in prompt_lower:
+            LoggerHelper.log_info("Detected drag type: drag_fit (Fitting logic)", emoji='📦')
+            return "drag_fit"
+        
+        # 6. drag_pairs: Pair/Similarity matching
+        if "pair" in prompt_lower or "letter" in prompt_lower or "match" in prompt_lower or "similar" in prompt_lower:
+            LoggerHelper.log_info("Detected drag type: drag_pairs (Pair matching)", emoji='👫')
+            return "drag_pairs"
+        
+        # No specific type detected
+        LoggerHelper.log_info("Using default simplified drag prompt", emoji='📋')
         return None
 
     @log_method_call(emoji='🎯', color='cyan')
