@@ -33,11 +33,12 @@ class PilotActions:
         start_x, start_y = path.start_point.x, path.start_point.y
         end_x, end_y = path.end_point.x, path.end_point.y
         
-        # Move to the starting position
-        await self.page.mouse.move(start_x, start_y)
+        # Move to the starting position with steps to trigger hover states (Premium Reliability)
+        # Avoid the "jump" which can bypass mouseenter event listeners
+        await self.page.mouse.move(start_x, start_y, steps=random.randint(5, 10))
 
-        # Small random delay before pressing down (human reaction time)
-        await asyncio.sleep(random.uniform(0.05, 0.15))
+        # Small random delay before pressing down (human reaction time and UI settle)
+        await asyncio.sleep(random.uniform(0.1, 0.25))
 
         # Press the mouse button down
         await self.page.mouse.down()
