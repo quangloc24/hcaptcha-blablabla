@@ -1,27 +1,27 @@
 # -*- coding: utf-8 -*-
 """
-GroqProvider - Groq API implementation using Llama 3.2 Vision.
+GroqProvider - Groq API implementation using the official Groq SDK.
 
-This provider uses httpx to call the Groq API, providing a high-quota 
-alternative to Gemini for image-based content generation.
+This provider provides a high-quota alternative to Gemini for image-based 
+content generation, specifically optimized for Groq's Vision models.
 """
 import base64
 import json
 from pathlib import Path
 from typing import List, Type, TypeVar, Any
 
-import httpx
+from groq import Groq, AsyncGroq
 from loguru import logger
 from pydantic import BaseModel
-from tenacity import retry, stop_after_attempt, wait_fixed
 from hcaptcha_challenger.agent.logger import LoggerHelper
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 ResponseT = TypeVar("ResponseT", bound=BaseModel)
 
 
 class GroqProvider:
     """
-    Groq-based chat provider implementation.
+    Groq-based chat provider implementation using the official SDK.
     """
 
     def __init__(self, api_key: str | List[str], model: str | List[str] = "meta-llama/llama-4-scout-17b-16e-instruct"):
@@ -44,7 +44,7 @@ class GroqProvider:
         
         self._key_index = 0
         self._model_index = 0
-        self._response_data: dict | None = None
+        self._last_raw_response: Any = None
 
     @property
     def model(self) -> str:
@@ -55,20 +55,18 @@ class GroqProvider:
         """Rotate to the next API key in the list. If all keys used, rotate model."""
         if len(self._api_keys) > 1:
             self._key_index = (self._key_index + 1) % len(self._api_keys)
-            LoggerHelper.log_info(f"Rotacionando chave API Groq. Novo índice: {self._key_index}", emoji='refresh')
+            LoggerHelper.log_info(f"Rotating Groq API key. New index: {self._key_index}", emoji='refresh')
             
-            # If we wrapped around to the first key, rotate the model too
             if self._key_index == 0 and len(self._models) > 1:
                 self.rotate_model()
         elif len(self._models) > 1:
-            # Only one key, but multiple models - rotate model
             self.rotate_model()
 
     def rotate_model(self):
         """Rotate to the next model in the list."""
         if len(self._models) > 1:
             self._model_index = (self._model_index + 1) % len(self._models)
-            LoggerHelper.log_info(f"Rotacionando modelo Groq. Novo modelo: {self.model}", emoji='refresh')
+            LoggerHelper.log_info(f"Rotating Groq model. New model: {self.model}", emoji='refresh')
 
     @property
     def api_key(self) -> str:
@@ -96,14 +94,10 @@ class GroqProvider:
         **kwargs,
     ) -> ResponseT:
         """
-        Generate content with image inputs using Groq API.
+        Generate content with image inputs using Groq SDK.
         """
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-
+        client = AsyncGroq(api_key=self.api_key)
+        
         content = []
         if user_prompt:
             content.append({"type": "text", "text": user_prompt})
@@ -111,7 +105,6 @@ class GroqProvider:
         for img_path in images:
             if img_path.exists():
                 base64_image = self._encode_image(img_path)
-                # Groq supports data URLs for images
                 mime_type = "image/png" if img_path.suffix.lower() == ".png" else "image/jpeg"
                 content.append({
                     "type": "image_url",
@@ -126,80 +119,74 @@ class GroqProvider:
         
         messages.append({"role": "user", "content": content})
 
-        # Groq requires that if response_format is json_object, the prompt must contain "JSON"
-        # We also inject the schema to ensure the model uses the correct keys
+        # Inject JSON schema instruction if applicable
         schema_instruction = ""
         if response_schema and issubclass(response_schema, BaseModel):
             try:
                 schema = response_schema.model_json_schema()
-                schema_instruction = f" You must respond with a JSON object matching this schema: {json.dumps(schema)}"
+                schema_instruction = f" Respond strictly in JSON format matching this schema: {json.dumps(schema)}"
+                # Groq's JSON mode requires "JSON" to be in the prompt
+                if "JSON" not in (user_prompt or ""):
+                    messages.append({"role": "user", "content": f"The final response MUST be in JSON format.{schema_instruction}"})
             except Exception as e:
                 logger.warning(f"Failed to generate JSON schema: {e}")
 
-        if "JSON" not in (description or "") and "JSON" not in (user_prompt or ""):
-            messages.append({"role": "user", "content": f"Please respond in JSON format.{schema_instruction}"})
-        elif schema_instruction:
-             messages.append({"role": "user", "content": f"Ensure the response follows this JSON schema: {schema_instruction}"})
-
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "response_format": {"type": "json_object"},
-            "temperature": 0.0,
-            "max_tokens": 1024,
-        }
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(url, headers=headers, json=payload)
-            
-            if response.status_code == 429:
-                LoggerHelper.log_warning(f"Quota da API Groq Esgotada (429) para o índice de chave {self._key_index}", emoji='skull')
-                self.rotate_key()
-                response.raise_for_status()
-            
-            if response.status_code >= 400:
-                LoggerHelper.log_error(f"Erro na API Groq ({response.status_code}): {response.text}")
-                if response.status_code == 400:
-                    LoggerHelper.log_error("Verifique se o modelo suporta visão ou se o prompt é válido.")
-                response.raise_for_status()
-            self._response_data = response.json()
-
-        # Extract content
-        result_text = self._response_data["choices"][0]["message"]["content"]
         try:
+            chat_completion = await client.chat.completions.create(
+                messages=messages,
+                model=self.model,
+                response_format={"type": "json_object"} if response_schema else None,
+                temperature=0.0,
+                max_tokens=1024,
+            )
+            
+            self._last_raw_response = chat_completion
+            result_text = chat_completion.choices[0].message.content
+            
+            if not result_text:
+                raise ValueError("Empty response from Groq API")
+                
             result_json = json.loads(result_text)
             
-            # Normalize coordinates for ImageBinaryChallenge (box_2d format)
-            # The model sometimes returns ["01"] instead of [0, 1]
+            # Post-processing for coordinate normalization (Llama 3.2 Vision quirk)
             if "coordinates" in result_json and isinstance(result_json["coordinates"], list):
                 for coord in result_json["coordinates"]:
                     if "box_2d" in coord and isinstance(coord["box_2d"], list):
-                        normalized = []
-                        for val in coord["box_2d"]:
-                            if isinstance(val, str):
-                                # Convert "01" to [0, 1] or "12" to [1, 2]
-                                if len(val) == 2 and val.isdigit():
-                                    normalized.extend([int(val[0]), int(val[1])])
-                                else:
-                                    normalized.append(int(val) if val.isdigit() else val)
-                            else:
-                                normalized.append(val)
-                        coord["box_2d"] = normalized[:2] if len(normalized) >= 2 else normalized
+                        coord["box_2d"] = [int(v) if str(v).isdigit() else v for v in coord["box_2d"][:4]]
             
             return response_schema(**result_json)
+
         except Exception as e:
-            LoggerHelper.log_error(f"Falha ao analisar resposta da Groq como JSON: {result_text}")
+            err_msg = str(e).lower()
+            if "429" in err_msg or "rate_limit" in err_msg:
+                LoggerHelper.log_warning(f"Groq Rate Limit (429). Rotating key...", emoji='⏳')
+                self.rotate_key()
+            elif "400" in err_msg:
+                 LoggerHelper.log_error(f"Groq API Error 400: {e}. Check model support for vision.")
+            
+            LoggerHelper.log_error(f"Groq Provider Error: {e}")
             raise e
 
     def cache_response(self, path: Path) -> None:
         """Cache the last response to a file."""
-        if not self._response_data:
+        if not self._last_raw_response:
             return
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(
-                json.dumps(self._response_data, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
+            # Serialize the completion object to dict for saving
+            output = {
+                "id": self._last_raw_response.id,
+                "model": self._last_raw_response.model,
+                "choices": [
+                    {
+                        "message": {
+                            "role": c.message.role,
+                            "content": c.message.content
+                        },
+                        "finish_reason": c.finish_reason
+                    } for c in self._last_raw_response.choices
+                ]
+            }
+            path.write_text(json.dumps(output, indent=2, ensure_ascii=False), encoding="utf-8")
         except Exception as e:
-            LoggerHelper.log_warning(f"Falha ao salvar cache de resposta: {e}")
+            LoggerHelper.log_warning(f"Failed to save response cache: {e}")
