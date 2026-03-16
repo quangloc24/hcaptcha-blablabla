@@ -174,8 +174,33 @@ class PilotChallenges:
                     LoggerHelper.log_info("Using default global prompt", emoji='📝')
                 
                 # Soul Alignment: Dynamic Hinting based on challenge type
+                # We inject the core strategy directly into the user hint to ensure priority
+                type_hint = ""
+                if challenge_type == "drag_road":
+                    type_hint = (
+                        "ROAD RECONSTRUCTION STRATEGY:\n"
+                        "- SEQUENTIAL LOGIC: Pieces are numbered (3, 4, etc.). Connect piece 3 to segment 2, and 4 to 3.\n"
+                        "- VERTICAL SEAMING: If the path changes height (Y-level), target the geometric mid-point between rows.\n"
+                        "- ZERO OVERLAP: Every piece must occupy its own unique grid slot."
+                    )
+                elif challenge_type == "drag_connection":
+                    type_hint = (
+                        "CONNECTION TRACING STRATEGY:\n"
+                        "- COLOR PATHS: Follow the specific colored line from the piece to its target.\n"
+                        "- IGNORE INTERSECTIONS: Use color, not spatial overlap, to stay on the correct path.\n"
+                        "- TERMINAL MATCH: The path must end at a semantic target (tree, building) of the same color."
+                    )
+                elif challenge_type == "drag_halves":
+                    type_hint = (
+                        "GEOMETRIC MATCHING STRATEGY:\n"
+                        "- COMPLEMENTARY SHAPES: Match concave notches with convex bumps.\n"
+                        "- PATTERN ALIGNMENT: Internal textures/lines must align perfectly.\n"
+                        "- CELL CENTERING: Target the absolute center of the target grid cell."
+                    )
+
                 ai_hint = (
                     f"{user_prompt}\n"
+                    f"{type_hint}\n"
                     "INVENTORY LOCKDOWN: Count draggable elements on the RIGHT. Return EXACTLY that many paths.\n"
                     "NO UI ELEMENTS: Ignore 'Move' buttons, labels, and numbers as candidates.\n"
                     "VALIDATION: start_point.x MUST be > end_point.x."
