@@ -179,9 +179,9 @@ class PilotChallenges:
                 if challenge_type == "drag_road":
                     type_hint = (
                         "ROAD RECONSTRUCTION STRATEGY:\n"
-                        "- SEQUENTIAL LOGIC: Pieces are numbered (3, 4, etc.). Connect piece 3 to segment 2, and 4 to 3.\n"
-                        "- VERTICAL SEAMING: If the path changes height (Y-level), target the geometric mid-point between rows.\n"
-                        "- ZERO OVERLAP: Every piece must occupy its own unique grid slot."
+                        "- SEQUENTIAL LOGIC: Draggable pieces are numbered. Connect them to their numeric neighbors on the grid (e.g., Piece 3 connects to Segment 2).\n"
+                        "- VERTICAL SEAMING: For height transitions, target the geometric mid-point between row levels.\n"
+                        "- ZERO OVERLAP: Each draggable piece must occupy a unique empty grid slot."
                     )
                 elif challenge_type == "drag_connection":
                     type_hint = (
@@ -215,8 +215,8 @@ class PilotChallenges:
                 ai_hint = (
                     f"{user_prompt}\n"
                     f"{type_hint}\n"
-                    "INVENTORY LOCKDOWN: Count draggable elements on the RIGHT. Return EXACTLY that many paths.\n"
-                    "NO UI ELEMENTS: Ignore 'Move' buttons, labels, and numbers as candidates.\n"
+                    "INVENTORY LOCKDOWN: Count handles on the RIGHT. Return EXACTLY that many paths. Numbered circles ARE draggable pieces.\n"
+                    "NO UI ELEMENTS: Ignore 'Move' text strips and grid axis numbers as candidates.\n"
                     "VALIDATION: start_point.x MUST be > end_point.x."
                 )
                 
