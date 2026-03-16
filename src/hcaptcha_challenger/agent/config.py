@@ -137,33 +137,40 @@ class AgentConfig(BaseSettings):
     )
     skills_update_branch: str = Field(default="main", description="GitHub branch for skills update")
 
-    @field_validator('GEMINI_API_KEYS', mode="before")
+    @field_validator('GEMINI_API_KEYS', 'GROQ_API_KEYS', mode="before")
     @classmethod
-    def validate_api_keys(cls, v: Any) -> List[SecretStr]:
+    def validate_api_keys(cls, v: Any, info) -> List[SecretStr]:
         """
-        Validates and parses Gemini API keys.
+        Validates and parses API keys.
         Supports comma-separated strings (from env) or lists.
         """
+        field_name = info.field_name
+        env_plural = field_name
+        env_singular = field_name.rstrip('S')
+        
         # 1. Handle string input (e.g. from environment variable)
         if isinstance(v, str):
             v = [k.strip() for k in v.split(",") if k.strip()]
         
         # 2. Fallback to environment variables if still empty
         if not v:
-            env_keys = os.environ.get("GEMINI_API_KEYS", "")
+            env_keys = os.environ.get(env_plural, "")
             if env_keys:
                 v = [k.strip() for k in env_keys.split(",") if k.strip()]
             else:
-                single_key = os.environ.get("GEMINI_API_KEY")
+                single_key = os.environ.get(env_singular)
                 if single_key:
                     v = [single_key]
         
         # 3. Final validation
         if not v:
-            raise ValueError(
-                "GEMINI_API_KEYS is required but not provided. "
-                "Please set the GEMINI_API_KEYS (comma-separated) or GEMINI_API_KEY environment variable."
-            )
+            # GROQ_API_KEYS defaults to None if not provided, but GEMINI is required
+            if field_name == "GEMINI_API_KEYS":
+                raise ValueError(
+                    f"{field_name} is required but not provided. "
+                    f"Please set the {env_plural} (comma-separated) or {env_singular} environment variable."
+                )
+            return []
             
         # 4. Ensure everything is a SecretStr
         return [SecretStr(k) if isinstance(k, str) else k for k in v]
