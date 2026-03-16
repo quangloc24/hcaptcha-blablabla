@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, Tuple, List, Union
 from playwright.async_api import Page, Frame
 
-from hcaptcha_challenger.models import CaptchaPayload, ChallengeTypeEnum, RequestType
+from hcaptcha_challenger.models import CaptchaPayload, ChallengeTypeEnum, RequestType, GROQ_MODEL_PRIORITY
 from hcaptcha_challenger.skills import SkillManager
 from hcaptcha_challenger.agent.logger import LoggerHelper, MetricsLogger, console
 from hcaptcha_challenger.agent.pilot import PilotActions, PilotNavigation, PilotChallenges, PilotCore
@@ -58,7 +58,12 @@ class RoboticArm:
             groq_keys = [k.get_secret_value() if hasattr(k, "get_secret_value") else str(k) 
                         for k in self.config.GROQ_API_KEYS] if self.config.GROQ_API_KEYS else []
             
-            model = self.config.IMAGE_CLASSIFIER_MODEL or "llama-4-scout-17b-16e-instruct"
+            from hcaptcha_challenger.models import DEFAULT_SCOT_MODEL
+            # Ensure we don't leak Gemini model names into Groq initialization
+            model = self.config.IMAGE_CLASSIFIER_MODEL
+            if not model or "gemini" in str(model).lower():
+                model = DEFAULT_SCOT_MODEL
+                
             provider = GroqProvider(api_key=groq_keys, model=model)
             
             self._image_classifier = ImageClassifier(gemini_api_key="", model=model, provider=provider)
@@ -89,29 +94,42 @@ class RoboticArm:
     async def _get_available_model_and_keys(self, preferred_model: Optional[str] = None) -> Tuple[Optional[str], List[str]]:
         """
         Returns model and non-exhausted keys based on priority.
-        Ported from lines 75-90 of original.
+        Handles both Gemini and Groq providers.
         """
-        api_keys = self.config.GEMINI_API_KEYS
+        is_groq = self.config.AI_PROVIDER == "groq"
+        api_keys = self.config.GROQ_API_KEYS if is_groq else self.config.GEMINI_API_KEYS
         
-        # Model priority (lighter first to ensure speed)
-        model_priority = [
-            "gemini-3.1-flash-lite-preview",
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
-            "gemini-3-flash-preview",
-        ]
+        if is_groq:
+            model_priority = list(GROQ_MODEL_PRIORITY)
+        else:
+            # Model priority (lighter first to ensure speed)
+            model_priority = [
+                "gemini-3.1-flash-lite-preview",
+                "gemini-2.5-flash",
+                "gemini-2.5-flash-lite",
+                "gemini-3-flash-preview",
+            ]
 
-        
-        # If a specific model was requested, use it
+        # If a specific model was requested, use it as priority
         if preferred_model:
-            model_priority = [preferred_model] + [m for m in model_priority if m != preferred_model]
+            # Soul Alignment: If the preferred model is incompatible with the provider, ignore it
+            # This happens when switching providers but keeping default config values
+            if is_groq and "gemini" in preferred_model.lower():
+                preferred_model = None
+            elif not is_groq and ("llama" in preferred_model.lower() or "scout" in preferred_model.lower()):
+                preferred_model = None
+            
+            if preferred_model:
+                # Ensure preferred_model is at the front
+                model_priority = [preferred_model] + [m for m in model_priority if m != preferred_model]
         
         for model in model_priority:
             available_keys = []
-            for key in api_keys:
-                key_str = key.get_secret_value() if hasattr(key, "get_secret_value") else str(key)
-                if not self.core.quota_manager.is_exhausted(key_str, model):
-                    available_keys.append(key_str)
+            if api_keys:
+                for key in api_keys:
+                    key_str = key.get_secret_value() if hasattr(key, "get_secret_value") else str(key)
+                    if not self.core.quota_manager.is_exhausted(key_str, model):
+                        available_keys.append(key_str)
             
             if available_keys:
                 return model, available_keys

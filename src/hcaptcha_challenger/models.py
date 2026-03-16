@@ -254,6 +254,12 @@ SCoTModelType = Union[
 
 DEFAULT_SCOT_MODEL: SCoTModelType = "meta-llama/llama-4-scout-17b-16e-instruct"
 
+GROQ_MODEL_PRIORITY: List[str] = [
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "llama-3.2-90b-vision-preview",
+    "llama-3.2-11b-vision-preview",
+]
+
 FastShotModelType = Union[
     str,
     Literal[

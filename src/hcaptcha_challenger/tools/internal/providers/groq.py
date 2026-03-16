@@ -33,15 +33,20 @@ class GroqProvider:
             model: Model name or list of model names to use.
         """
         if isinstance(api_key, str):
-            self._api_keys = [api_key]
+            self._api_keys = [api_key] if api_key else []
         else:
-            self._api_keys = api_key
+            self._api_keys = [k for k in api_key if k] if api_key else []
         
         if isinstance(model, str):
-            self._models = [model]
+            self._models = [model] if model else ["meta-llama/llama-4-scout-17b-16e-instruct"]
         else:
-            self._models = model
+            self._models = [m for m in model if m] if model else ["meta-llama/llama-4-scout-17b-16e-instruct"]
         
+        if not self._api_keys:
+            LoggerHelper.log_error("GroqProvider: No valid API keys provided!", emoji='skull')
+            # Fallback to avoid IndexError, though it will still fail to call
+            self._api_keys = ["MISSING_KEY"]
+            
         self._key_index = 0
         self._model_index = 0
         self._last_raw_response: Any = None
@@ -49,7 +54,9 @@ class GroqProvider:
     @property
     def model(self) -> str:
         """Get the current active model name."""
-        return self._models[self._model_index]
+        if not self._models:
+            return "meta-llama/llama-4-scout-17b-16e-instruct"
+        return self._models[self._model_index % len(self._models)]
 
     def rotate_key(self):
         """Rotate to the next API key in the list. If all keys used, rotate model."""
@@ -70,7 +77,9 @@ class GroqProvider:
 
     @property
     def api_key(self) -> str:
-        return self._api_keys[self._key_index]
+        if not self._api_keys:
+            return "MISSING_KEY"
+        return self._api_keys[self._key_index % len(self._api_keys)]
 
     def _encode_image(self, image_path: Path) -> str:
         """Encode image to base64 string."""
@@ -96,6 +105,9 @@ class GroqProvider:
         """
         Generate content with image inputs using Groq SDK.
         """
+        if self.api_key == "MISSING_KEY":
+            raise ValueError("Groq API Key is missing. Check your configuration.")
+
         client = AsyncGroq(api_key=self.api_key)
         
         content = []
@@ -141,10 +153,14 @@ class GroqProvider:
             )
             
             self._last_raw_response = chat_completion
+            
+            if not chat_completion.choices:
+                raise ValueError("Groq API returned an empty choices list (no response generated)")
+                
             result_text = chat_completion.choices[0].message.content
             
             if not result_text:
-                raise ValueError("Empty response from Groq API")
+                raise ValueError("Empty content in Groq API response")
                 
             result_json = json.loads(result_text)
             
