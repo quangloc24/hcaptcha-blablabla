@@ -163,7 +163,9 @@ class PilotChallenges:
                 )
                 
                 # Determine challenge type for specific prompt selection
-                challenge_type = self._detect_drag_challenge_type(user_prompt)
+                # Use raw question for detection to avoid SkillManager masking keywords
+                raw_prompt = self.arm.captcha_payload.get_requester_question() if self.arm.captcha_payload else ""
+                challenge_type = self._detect_drag_challenge_type(raw_prompt)
                 
                 # Log which prompt is being used
                 if challenge_type:
