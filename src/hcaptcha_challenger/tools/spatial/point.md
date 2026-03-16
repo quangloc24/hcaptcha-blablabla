@@ -22,12 +22,14 @@ Use the labeled grid lines on the X and Y axes as a ruler:
 
 ### 3. Motion Challenge (Dynamic Logic)
 
-If multiple frames (Frame 0-4) are provided, you are in **Burst Mode**. The prompt will ask for a "difference" in movement:
+If multiple frames are provided, you are in **Burst Mode**. The sequence consists of **5 Temporal Frames** (Frame 0-4) followed by **1 Coordinate Grid Overlay** image (the 6th image):
 
+- **Sequential Analysis**: Analyze movement patterns across Frames 0, 1, 2, 3, and 4.
 - **Velocity Anomaly**: Identify the object whose pixel displacement between Frame 0 and Frame 4 is the largest (fastest) or smallest (slowest/static).
 - **Orbital/Rotational Difference**: If objects are circling, identify the one moving clockwise vs counter-clockwise, or circling a different radius.
 - **Trajectory Pivot**: Identify the object moving along a different axis (e.g., pumping up/down while others move left/right).
 - **Phasing/Blinking**: Look for objects that appear/disappear or change state across the 5-frame sequence.
+- **Spatial Mapping**: Use the **Coordinate Grid Overlay** (the last image in the sequence) to identify the (X, Y) center-point of the target discovered in the frames.
 - **Ignore Spatial Gaps**: NEVER select an object just because it is far away from others. Focus strictly on its **behavioral path** across the frames.
 
 ## 3. Mandatory Verification Step
@@ -43,9 +45,9 @@ Return the center point(s) in JSON:
 
 ```json
 {
-  "target_description": "Detailed description of the unique object",
-  "center_point": { "x": 225, "y": 425 }
+  "challenge_prompt": "Select the object that is moving differently than others",
+  "points": [{ "x": 225, "y": 425 }]
 }
 ```
 
-If multiple targets are required, provide them as a list if the schema permits.
+If multiple targets are required, provide them as a list. Use YOUR internal description to justify the choice, but only return the coordinates in the final JSON.

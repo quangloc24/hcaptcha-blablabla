@@ -375,12 +375,34 @@ class PilotChallenges:
                 preferred_model=self.arm.config.SPATIAL_POINT_REASONER_MODEL
             )
             
+            # Determine hint based on motion or uniqueness
+            if is_motion:
+                type_hint = (
+                    "BURST MODE ANALYSIS (TEMPORAL DELTA):\n"
+                    "- FRAME COMPARISON: Analyze pixel displacement between Frame 0 and Frame 4.\n"
+                    "- ANOMALY DETECTION: Identify the object moving at a different velocity or rotational vector (CW vs CCW).\n"
+                    "- BEHAVIORAL PATH: Ignore spatial separation; focus ONLY on behavioral inconsistency across frames."
+                )
+            else:
+                type_hint = (
+                    "UNIQUENESS STRATEGY:\n"
+                    "- CHARACTERISTIC ANOMALY: Identify the object with a different color, shape, or texture than its peers.\n"
+                    "- GRID LOCK: Align target center using X/Y labels."
+                )
+
+            ai_hint = (
+                f"{user_prompt}\n"
+                f"{type_hint}\n"
+                "COORDINATE ACCURACY: Use X/Y grid labels. Return exact center points.\n"
+                "NO UI ELEMENTS: Ignore 'Verify' buttons or labels."
+            )
+            
             try:
                 start_ai = time.time()
                 response = await self.arm.spatial_point_reasoner(
                     challenge_screenshot=raw,
                     grid_divisions=projection,
-                    auxiliary_information=user_prompt
+                    auxiliary_information=ai_hint
                 )
                 ai_duration = time.time() - start_ai
                 if model and available_keys:
