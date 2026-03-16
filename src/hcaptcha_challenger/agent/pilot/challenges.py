@@ -197,6 +197,20 @@ class PilotChallenges:
                         "- PATTERN ALIGNMENT: Internal textures/lines must align perfectly.\n"
                         "- CELL CENTERING: Target the absolute center of the target grid cell."
                     )
+                elif challenge_type == "drag_fit":
+                    type_hint = (
+                        "FITTING STRATEGY:\n"
+                        "- SINGULAR TASK: This is usually one element. Verify if only ONE 'Move' handle exists.\n"
+                        "- SILHOUETTE MATCH: Match the draggable element's outline to the empty contour on the canvas.\n"
+                        "- CENTER ALIGNMENT: Drag to the geometric center of the fitting slot."
+                    )
+                elif challenge_type == "drag_pairs":
+                    type_hint = (
+                        "PAIR MATCHING STRATEGY:\n"
+                        "- SIMILARITY: Match identical or semantically related items (e.g., A to A).\n"
+                        "- HANDLE COUNT: Count 'Move' labels on the right. If 1 handle, return 1 path. If 4 handles, return 4 paths.\n"
+                        "- PRECISE DROP: Align the center of the piece with the center of its match."
+                    )
 
                 ai_hint = (
                     f"{user_prompt}\n"
