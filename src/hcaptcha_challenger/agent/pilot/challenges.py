@@ -32,7 +32,7 @@ class PilotChallenges:
             except: pass
         return True
 
-    async def _capture_burst_frames(self, frame: FrameLocator | Frame, cache_key: Path, cid: int, count: int = 3) -> list[Path]:
+    async def _capture_burst_frames(self, frame: FrameLocator | Frame, cache_key: Path, cid: int, count: int = 5) -> list[Path]:
         """
         Captures a sequence of screenshots for motion challenges.
         """
@@ -162,16 +162,28 @@ class PilotChallenges:
                     preferred_model=self.arm.config.SPATIAL_PATH_REASONER_MODEL
                 )
                 
+                # Determine challenge type for specific prompt selection
+                challenge_type = self._detect_drag_challenge_type(user_prompt)
+                
+                # Log which prompt is being used
+                if challenge_type:
+                    LoggerHelper.log_info(f"Using specialized prompt: {challenge_type}", emoji='📝')
+                else:
+                    LoggerHelper.log_info("Using default global prompt", emoji='📝')
+                
                 # Soul Alignment: High precision instruction (Ported from line 825)
                 ai_hint = (
                     f"{user_prompt}\n"
                     "STEP-BY-STEP INSTRUCTIONS:\n"
-                    "1. The RIGHT side has draggable line segments stacked vertically.\n"
-                    "2. The LEFT side has incomplete lines with visible GAPS.\n"
-                    "3. Match each segment to its gap by ANGLE and CURVATURE continuity.\n"
-                    "4. FROM = center of draggable piece (right side, higher X). TO = center of gap (left side, lower X).\n"
-                    "5. Read all coordinates from the GRID AXIS LABELS, not pixel estimation.\n"
-                    "6. VALIDATION: start_point.x MUST be > end_point.x (right to left movement)."
+                    "1. INVENTORY LOCKDOWN: Count draggable elements on the RIGHT. Return EXACTLY that many paths.\n"
+                    "2. NO UI ELEMENTS: Ignore 'Move' buttons, labels, and numbers as candidates.\n"
+                    "3. CHROMATIC & NUMERIC LOCK: Match pieces to neighbors by color and number. Segment '2' connects to piece '3', which connects to segment '4'.\n"
+                    "4. CHRONOLOGICAL ORDERING: If multiple pieces are numbered, identify the sequence (e.g. 1, 2, 3) and place them in that exact order on the grid from the CHARACTER (Start) to the EXIT (End).\n"
+                    "5. GEOMETRIC MATCH: Align notches/bumps for a perfect unit.\n"
+                    "6. VERTICAL SEAMING: If gaps connect different Y-levels, target the geometric mid-point between the two road rows.\n"
+                    "7. FROM = center of piece (Higher X). TO = center of target slot (Lower X).\n"
+                    "8. GRID ACCURACY: Use the AXIS LABELS to target the geometric center.\n"
+                    "9. VALIDATION: start_point.x MUST be > end_point.x."
                 )
                 
                 try:
@@ -179,7 +191,8 @@ class PilotChallenges:
                     response = await self.arm.spatial_path_reasoner(
                         challenge_screenshot=raw,
                         grid_divisions=projection,
-                        auxiliary_information=ai_hint
+                        auxiliary_information=ai_hint,
+                        challenge_type=challenge_type
                     )
                     ai_duration = time.time() - start_ai
                     model_used = model
@@ -228,6 +241,36 @@ class PilotChallenges:
             await self._click_submit(frame)
             self.tracker.log_round(cid+1, True, time.time()-round_start, ai_duration, len(response.paths))
 
+    def _detect_drag_challenge_type(self, user_prompt: str) -> str | None:
+        """
+        Detect the specific drag challenge type from the user prompt.
+        
+        Args:
+            user_prompt: The challenge prompt text
+            
+        Returns:
+            The specific drag type identifier or None for default prompt
+        """
+        prompt_lower = user_prompt.lower() if user_prompt else ""
+        
+        # Check for specific drag challenge patterns
+        if "similar" in prompt_lower:
+            LoggerHelper.log_info("Detected drag type: drag_similar (finding similar shapes)", emoji='🎯')
+            return "drag_similar"
+        elif "shadow" in prompt_lower or "pattern that match" in prompt_lower:
+            LoggerHelper.log_info("Detected drag type: drag_shadow (matching object to shadow)", emoji='🎯')
+            return "drag_shadow"
+        elif "pair" in prompt_lower:
+            LoggerHelper.log_info("Detected drag type: drag_pairs (completing pairs)", emoji='🎯')
+            return "drag_pairs"
+        elif "connect" in prompt_lower or "tree" in prompt_lower:
+            LoggerHelper.log_info("Detected drag type: drag_connection (color-based connection)", emoji='🎯')
+            return "drag_connection"
+        
+        # No specific type detected, use default prompt
+        LoggerHelper.log_info("Using default drag prompt (no specific type detected)", emoji='📋')
+        return None
+
     @log_method_call(emoji='🎯', color='cyan')
     async def handle_label_select(self, job_type: ChallengeTypeEnum):
         frame = await self.arm.navigation.get_challenge_frame_locator()
@@ -256,8 +299,8 @@ class PilotChallenges:
             self.arm.navigation.current_view_bbox = bbox
 
             if is_motion:
-                LoggerHelper.log_info("Motion Challenge detected! Activating Burst Mode (3 frames)...", emoji='📸')
-                challenge_screenshots = await self._capture_burst_frames(frame, cache_key, cid, count=3)
+                LoggerHelper.log_info("Motion Challenge detected! Activating Burst Mode (5 frames)...", emoji='📸')
+                challenge_screenshots = await self._capture_burst_frames(frame, cache_key, cid, count=5)
                 
                 # For grid, we use the last frame of the burst (bbox already defined above)
                 

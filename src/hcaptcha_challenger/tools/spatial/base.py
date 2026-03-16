@@ -34,6 +34,7 @@ class SpatialReasoner(Reasoner[SCoTModelType, ResponseT], ABC):
         grid_divisions: Path,
         auxiliary_information: str | None = None,
         response_schema: type[ResponseT],
+        description: str | None = None,
         **kwargs,
     ) -> ResponseT:
         """
@@ -45,6 +46,7 @@ class SpatialReasoner(Reasoner[SCoTModelType, ResponseT], ABC):
             auxiliary_information: Optional user prompt with additional context.
             thinking_level: Override for thinking level.
             response_schema: Pydantic model for structured output.
+            description: Optional override for the default description/prompt.
             temperature: Override for sampling temperature.
             **kwargs: Additional provider options.
 
@@ -56,10 +58,13 @@ class SpatialReasoner(Reasoner[SCoTModelType, ResponseT], ABC):
         else:
              images: List[Path] = [challenge_screenshot, grid_divisions]
 
+        # Use provided description or fall back to class default
+        prompt_description = description if description else self.description
+
         return await self._provider.generate_with_images(
             images=images,
             user_prompt=auxiliary_information,
-            description=self.description,
+            description=prompt_description,
             response_schema=response_schema,
             **kwargs,
         )

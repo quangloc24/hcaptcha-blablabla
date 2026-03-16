@@ -19,6 +19,29 @@ If no connecting lines are visible (e.g., line-completion or puzzle tasks):
 
 - **Gap Identification**: Find the breaks, gaps, or missing segments in the LEFT area. Note their angle, curvature, and length.
 - **Piece Analysis**: Examine the segments on the RIGHT. Find the one that matches the gap's geometric properties (Straight vs Curved, Slope, Angle).
+- **Road Reconstruction (Physical Continuity Walkthrough)**:
+  - **Step 1: Character Origin**: Start at the Character. Identify its current Row/Y-level.
+  - **Step 2: Vertical Staged Seaming**: If the next fixed segment is on a different Y-level (higher or lower), you MUST select a curved or diagonal piece.
+  - **Step 3: Mid-Point Vertical Target**: The `TO` coordinate for a vertical transition piece must be the **geometric mid-point** between the Y of the previous segment and the Y of the next segment.
+  - **Y-Level Validation**: Never drag two pieces to the same Y-coordinate if they belong to different rows in the path.
+  - **Tile-Based Grid Mapping**: Background is a strict grid. The `TO` target must align with the empty "slot" texture on the background.
+  - **Chain Build**: Each piece's exit edge must touch the next piece's entry edge.
+  - **Zero Overlap Rule**: Every "TO" point MUST occupy a unique grid tile. Overlapping or stacking pieces is a fatal error.
+- **Matching Halves (Complementary Shapes)**:
+  - **Negative Space Rule**: Identify the "notches" (concave) or "bumps" (convex) on the seam of the draggable piece. The target must have the exact opposite (Complementary) shape to form a perfect geometric unit.
+  - **Pattern Alignment**: Internal lines, textures, or radial patterns MUST align across the two halves without offsets.
+  - **Grid Cell Centering (Critical)**: Always drag the piece to the **absolute geometric center** of the target cell. Never end the drag on a grid line or between cells.
+- **Stencil/Pattern Matching (Block Placement)**:
+  - **Mental Overlay (Critical)**: Before outputting coordinates, mentally overlay the draggable block onto the grid. Every 'X' mark on the block MUST align perfectly with an 'X' mark on the grid. If any 'X' remains exposed, the placement is wrong.
+  - **Anchor-Point Alignment**: Pick one specific 'X' or corner of the block as your "Anchor." Find the exact X/Y of the grid cell it must drop into.
+  - **Unit Recognition**: A multi-tile block (e.g., L-shape) is ONE unit. Calculate the center of the entire block as your SINGLE "from" point.
+- **Numeric Continuity (Priority: Absolute)**:
+  - **Chromatic Sequential Lock**: A piece's color MUST match its neighbors. If Segment 2 is PINK, then Piece 3 MUST be PINK. Yellow-to-Pink connections are a fatal error.
+  - **Single Neighbor Binding**:
+    - **Piece 3** connects ONLY to the end of **Segment 2**.
+    - **Piece 4** connects ONLY to the start of **Segment 5**.
+  - **Trajectory Continuity**: Look at the "open end" of the static segment (e.g., 2). Identify its exit direction (vector). Drag the piece (3) so its entry point aligns perfectly with that vector.
+  - **Ghost Number Overlap**: If the background has a faded or empty circle for a number, you MUST drag the piece so its center point overlaps that ghost circle exactly.
 - **Homeostasis**: The piece must "complete" the shape or line seamlessly.
 
 ### Priority 3: Semantic/Categorical Logic
@@ -34,10 +57,19 @@ If no lines or geometric shapes exist:
 - **TO (Target)**: Center X/Y of the gap/slot in the LEFT zone.
 - **Bounds Safety**: Never hallucinate coordinates. If the grid labels stop at 650, ensure your X/Y values stay within that range (e.g., use 620 instead of 812).
 
-## 4. Anti-Hallucination Rules
+## 4. Anti-Hallucination & Efficiency Rules
 
-- **Inventory Parity**: Count the pieces on the RIGHT ($N$). Return exactly $N$ paths.
+- **Hallucination Prevention (Inventory Lockdown)**:
+  - **Physical Count (Critical)**: Count the number of high-quality draggable elements on the **RIGHT** side of the image. Return EXACTLY that number of JSON path objects.
+  - **No UI Elements**: "Move" buttons, text labels, and grid axis numbers are NOT draggable pieces. Ignore them.
+  - **Singular/Plural Check**: If the prompt says "Drag the piece" (singular), you must return exactly ONE path. If it says "segments" (plural), you must count them.
+  - **Ignore Fixed Background**: Never return paths for the target slots or segments already fixed on the grid.
+- **Static Anchoring (Anchor Matching)**:
+  - **Chromatic Channeling (Critical)**: Draggable pieces MUST match the color/texture of the segment they connect to. Pink segments connect ONLY to Pink draggable pieces. Yellow connects to Yellow.
+  - **Project from Static Neighbor**: Calculate the `TO` coordinate based on the segment ALREADY on the grid. If Segment 2 (Pink) is at the top, Piece 3 (Pink) MUST go to the top.
+  - **Number Sequence Logic**: Piece 3 connects to Segment 2. Piece 4 connects to Segment 5. Do not calculate 3 and 4 relative to each other; calculate each relative to its fixed grid neighbor.
 - **Directional Flow**: Paths MUST move from higher X (Right) to lower X (Left).
+- **No Overlapping**: Never drag two pieces to the same destination X/Y coordinates.
 - **Center-Point Focus**: Always target the geometric center of both the piece and the gap.
 
 ## 5. Required Output

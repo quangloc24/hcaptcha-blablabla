@@ -20,6 +20,16 @@ Use the labeled grid lines on the X and Y axes as a ruler:
 2. **Horizontal Alignment (Y-Axis)**: Trace a horizontal line from the target's center to the Y-axis. Record the numeric value.
 3. **Mid-point Interpolation**: If the target sits between labels (e.g., 200 and 300), estimate the exact unit (e.g., 250).
 
+### 3. Motion Challenge (Dynamic Logic)
+
+If multiple frames (Frame 0-4) are provided, you are in **Burst Mode**. The prompt will ask for a "difference" in movement:
+
+- **Velocity Anomaly**: Identify the object whose pixel displacement between Frame 0 and Frame 4 is the largest (fastest) or smallest (slowest/static).
+- **Orbital/Rotational Difference**: If objects are circling, identify the one moving clockwise vs counter-clockwise, or circling a different radius.
+- **Trajectory Pivot**: Identify the object moving along a different axis (e.g., pumping up/down while others move left/right).
+- **Phasing/Blinking**: Look for objects that appear/disappear or change state across the 5-frame sequence.
+- **Ignore Spatial Gaps**: NEVER select an object just because it is far away from others. Focus strictly on its **behavioral path** across the frames.
+
 ## 3. Mandatory Verification Step
 
 Before confirming the center point, explicitly verify:
