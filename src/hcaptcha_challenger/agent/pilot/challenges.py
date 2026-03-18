@@ -174,7 +174,7 @@ class PilotChallenges:
         """Phase 0: Saves challenge state to a structured audit folder."""
         try:
             timestamp = time.strftime("%Y%m%d-%H%M%S")
-            audit_dir = Path("tmp/audit").joinpath(category, subtype, timestamp)
+            audit_dir = self.arm.config.audit_dir.joinpath(category, subtype, timestamp)
             audit_dir.mkdir(parents=True, exist_ok=True)
             
             # 1. Save images
@@ -417,7 +417,7 @@ class PilotChallenges:
             is_success = await self._click_submit(frame)
             
             # Save final verdict
-            audit_dir = Path("tmp/audit").joinpath("drag_drop", challenge_type or "unknown")
+            audit_dir = self.arm.config.audit_dir.joinpath("drag_drop", challenge_type or "unknown")
             # Find the latest subdir (the one we just created)
             subdirs = sorted([d for d in audit_dir.iterdir() if d.is_dir()], key=os.path.getmtime)
             if subdirs:
