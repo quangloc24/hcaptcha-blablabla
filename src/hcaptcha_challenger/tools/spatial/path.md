@@ -35,13 +35,13 @@ If no connecting lines are visible (e.g., line-completion or puzzle tasks):
   - **Mental Overlay (Critical)**: Before outputting coordinates, mentally overlay the draggable block onto the grid. Every 'X' mark on the block MUST align perfectly with an 'X' mark on the grid. If any 'X' remains exposed, the placement is wrong.
   - **Anchor-Point Alignment**: Pick one specific 'X' or corner of the block as your "Anchor." Find the exact X/Y of the grid cell it must drop into.
   - **Unit Recognition**: A multi-tile block (e.g., L-shape) is ONE unit. Calculate the center of the entire block as your SINGLE "from" point.
-- **Numeric Continuity (Priority: Absolute)**:
-  - **Chromatic Sequential Lock**: A piece's color MUST match its neighbors. If Segment 2 is PINK, then Piece 3 MUST be PINK. Yellow-to-Pink connections are a fatal error.
-  - **Single Neighbor Binding**:
-    - **Piece 3** connects ONLY to the end of **Segment 2**.
-    - **Piece 4** connects ONLY to the start of **Segment 5**.
-  - **Trajectory Continuity**: Look at the "open end" of the static segment (e.g., 2). Identify its exit direction (vector). Drag the piece (3) so its entry point aligns perfectly with that vector.
-  - **Ghost Number Overlap**: If the background has a faded or empty circle for a number, you MUST drag the piece so its center point overlaps that ghost circle exactly.
+- **Chromatic Sequential Lock (NON-NEGOTIABLE)**:
+  - **Color Anchor**: A piece matches its neighbor ONLY if they share the EXACT same color and internal texture pattern.
+  - **PINK Segment 2** -> **PINK Piece 3**.
+  - **PURPLE Piece 3** next to **PINK Segment 2** is a TOTAL FAILURE. Redefine your selection.
+  - **Channel Check**: If Piece 3 is Purple, it MUST connect to a Purple neighbor.
+- **Trajectory Continuity**: Look at the "open end" of the static segment (e.g., 2). Identify its exit direction (vector). Drag the piece (3) so its entry point aligns perfectly with that vector.
+- **Ghost Number Overlap**: If the background has a faded or empty circle for a number, you MUST drag the piece so its center point overlaps that ghost circle exactly.
 - **Homeostasis**: The piece must "complete" the shape or line seamlessly.
 
 ### Priority 3: Semantic/Categorical Logic
