@@ -312,12 +312,13 @@ class PilotChallenges:
 
                 # Calculate grid context for high-precision hints
                 grid_config = self.arm.config.coordinate_grid
-                x_step = projection['width'] / (grid_config.x_line_space_num - 1)
-                y_step = projection['height'] / (grid_config.y_line_space_num - 1)
+                bbox = self.arm.navigation.current_view_bbox
+                x_step = bbox['width'] / (grid_config.x_line_space_num - 1)
+                y_step = bbox['height'] / (grid_config.y_line_space_num - 1)
                 
                 grid_context = (
-                    f"CANVAS BOUNDS: X[{int(projection['x'])}-{int(projection['x'] + projection['width'])}], "
-                    f"Y[{int(projection['y'])}-{int(projection['y'] + projection['height'])}]\n"
+                    f"CANVAS BOUNDS: X[{int(bbox['x'])}-{int(bbox['x'] + bbox['width'])}], "
+                    f"Y[{int(bbox['y'])}-{int(bbox['y'] + bbox['height'])}]\n"
                     f"GRID PRECISION: Major lines every {x_step:.1f}px (X) and {y_step:.1f}px (Y)."
                 )
 
@@ -380,7 +381,7 @@ class PilotChallenges:
                 primary=response.paths,
                 alternatives=getattr(response, 'alternatives', []),
                 challenge_type=challenge_type or "unknown",
-                bbox=projection
+                bbox=self.arm.navigation.current_view_bbox
             )
 
             for path in best_paths:
@@ -530,12 +531,13 @@ class PilotChallenges:
             
             # Calculate grid context for high-precision hints
             grid_config = self.arm.config.coordinate_grid
-            x_step = projection['width'] / (grid_config.x_line_space_num - 1)
-            y_step = projection['height'] / (grid_config.y_line_space_num - 1)
+            bbox = self.arm.navigation.current_view_bbox
+            x_step = bbox['width'] / (grid_config.x_line_space_num - 1)
+            y_step = bbox['height'] / (grid_config.y_line_space_num - 1)
             
             grid_context = (
-                f"CANVAS BOUNDS: X[{int(projection['x'])}-{int(projection['x'] + projection['width'])}], "
-                f"Y[{int(projection['y'])}-{int(projection['y'] + projection['height'])}]\n"
+                f"CANVAS BOUNDS: X[{int(bbox['x'])}-{int(bbox['x'] + bbox['width'])}], "
+                f"Y[{int(bbox['y'])}-{int(bbox['y'] + bbox['height'])}]\n"
                 f"GRID PRECISION: Major lines every {x_step:.1f}px (X) and {y_step:.1f}px (Y)."
             )
 
