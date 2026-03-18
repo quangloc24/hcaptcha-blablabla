@@ -242,6 +242,10 @@ class PilotChallenges:
             await self._wait_for_render_stability(frame)
             await self._wait_for_all_loaders_complete(frame)
             
+            # Determine challenge type immediately for routing and audit
+            raw_prompt = self.arm.captcha_payload.get_requester_question() if self.arm.captcha_payload else ""
+            challenge_type = self._detect_drag_challenge_type(raw_prompt)
+            
             raw, projection = await self._capture_spatial_mapping(frame, cache_key, cid)
             
             img_hash = self.arm.core.image_cache.get_hash(raw)
@@ -255,18 +259,11 @@ class PilotChallenges:
                 # Select a stronger model for complex challenges like "Road Reconstruction"
                 preferred_model = self.arm.config.SPATIAL_PATH_REASONER_MODEL
                 if challenge_type == "drag_road":
-                    # Use a thinking model if available in the priority list
-                    # For now, we rely on the RoboticArm to pick from the priority list
                     LoggerHelper.log_info("Hard challenge detected. Requesting high-precision reasoning...", emoji='🧠')
                 
                 model, available_keys = await self.arm._get_available_model_and_keys(
                     preferred_model=preferred_model
                 )
-                
-                # Determine challenge type for specific prompt selection
-                # Use raw question for detection to avoid SkillManager masking keywords
-                raw_prompt = self.arm.captcha_payload.get_requester_question() if self.arm.captcha_payload else ""
-                challenge_type = self._detect_drag_challenge_type(raw_prompt)
                 
                 # Log which prompt is being used
                 if challenge_type:
@@ -378,9 +375,10 @@ class PilotChallenges:
             self.arm.metrics.log_ai_call(ai_duration)
 
             # Phase 2: Heuristic Scorer (Top-K Selection)
+            # Ensure challenge_type is at least None for the scorer
             best_paths = await self._score_candidates(
                 primary=response.paths,
-                alternatives=response.alternatives,
+                alternatives=getattr(response, 'alternatives', []),
                 challenge_type=challenge_type or "unknown",
                 bbox=projection
             )
