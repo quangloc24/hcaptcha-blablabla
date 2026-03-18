@@ -193,7 +193,7 @@ class PilotNavigation:
         challenge_view = frame.locator("//div[@class='challenge-view']")
         cache_path = self.config.cache_dir.joinpath(f"challenge_view/_artifacts/{uuid.uuid4()}.png")
         cache_path.parent.mkdir(parents=True, exist_ok=True)
-        await challenge_view.screenshot(path=cache_path)
+        await challenge_view.screenshot(path=cache_path, timeout=5000)
         
         router_result = await self.arm.challenge_router(challenge_screenshot=cache_path)
         return router_result.challenge_type
@@ -207,7 +207,7 @@ class PilotNavigation:
                 await self.arm.actions.click_by_mouse(refresh_button)
                 await asyncio.sleep(2)
                 return True
-        await self.page.reload()
+        await self.page.reload(wait_until="domcontentloaded", timeout=10000)
         await asyncio.sleep(2)
         return True
 

@@ -105,7 +105,7 @@ class AgentV:
                             continue
                         
                         LoggerHelper.log_warning(f"Attempt {self.reset_count}/{self.config.MAX_RESETS} failed.", emoji='refresh')
-                        await self.page.reload()
+                        await self.page.reload(wait_until="domcontentloaded", timeout=5000)
                         await asyncio.sleep(2)
                         try:
                             await self.arm.actions.click_checkbox()
@@ -115,13 +115,13 @@ class AgentV:
                         continue
                 except asyncio.TimeoutError:
                     LoggerHelper.log_warning("Timeout during resolution. Restarting...", emoji='refresh')
-                    await self.page.reload()
+                    await self.page.reload(wait_until="domcontentloaded", timeout=5000)
                     await asyncio.sleep(2)
                     self.state = SolveState.INIT
                     continue
                 except Exception as err:
                     LoggerHelper.log_error(f"Critical error: {err}")
-                    await self.page.reload()
+                    await self.page.reload(wait_until="domcontentloaded", timeout=10000)
                     await asyncio.sleep(2)
                     self.state = SolveState.INIT
                     continue

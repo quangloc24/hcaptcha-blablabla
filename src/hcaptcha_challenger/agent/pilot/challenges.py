@@ -98,7 +98,7 @@ class PilotChallenges:
         for i in range(count):
             path = cache_key.joinpath(f"{cache_key.name}_{cid}_burst_{i}.png")
             path.parent.mkdir(parents=True, exist_ok=True)
-            await challenge_view.screenshot(type="png", path=path)
+            await challenge_view.screenshot(type="png", path=path, timeout=5000)
             screenshots.append(path)
             if i < count - 1:
                 await asyncio.sleep(0.2) # 200ms between frames
