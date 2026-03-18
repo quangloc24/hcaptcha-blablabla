@@ -245,6 +245,7 @@ IGNORE_REQUEST_TYPE_LITERAL = Literal[
 SCoTModelType = Union[
     str,
     Literal[
+        "gemini-robotics-er-1.5-preview",
         "gemini-3.1-flash-lite-preview",
         "gemini-2.5-flash-lite",
         "gemini-3-flash-preview",
@@ -273,6 +274,7 @@ FastShotModelType = Union[
 DEFAULT_FAST_SHOT_MODEL: FastShotModelType = "gemini-2.5-flash-lite"
 
 THINKING_BUDGET_MODELS: List[Union[SCoTModelType, FastShotModelType]] = [
+    "gemini-robotics-er-1.5-preview",
     "gemini-3.1-flash-lite-preview",
     "gemini-2.5-flash-lite",
     "gemini-3-flash-preview",
@@ -280,6 +282,7 @@ THINKING_BUDGET_MODELS: List[Union[SCoTModelType, FastShotModelType]] = [
 ]
 
 THINKING_LEVEL_MODELS: List[str] = [
+    "gemini-robotics-er-1.5-preview",
     "gemini-3.1-flash-lite-preview",
     "gemini-2.5-flash-lite",
     "gemini-3-flash-preview",
@@ -392,11 +395,18 @@ class ImageAreaSelectChallenge(BaseModel):
 class SpatialPath(BaseModel):
     start_point: PointCoordinate
     end_point: PointCoordinate
+    confidence: float = Field(default=1.0, description="Model's confidence in this specific path (0.0-1.0)")
+    label: str = Field(default="", description="Internal label or description for this piece (e.g. 'piece 3')")
 
 
 class ImageDragDropChallenge(BaseModel):
     challenge_prompt: str
     paths: List[SpatialPath]
+    alternatives: List[List[SpatialPath]] = Field(
+        default_factory=list, 
+        description="Top-K alternative candidates for the entire sequence"
+    )
+    reasoning: str = Field(default="", description="Chain-of-thought explanation for the selection")
 
     @property
     def path(self) -> List[SpatialPath]:

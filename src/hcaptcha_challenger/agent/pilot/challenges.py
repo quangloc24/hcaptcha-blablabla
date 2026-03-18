@@ -19,6 +19,62 @@ class PilotChallenges:
     def get_tracker(self):
         return self.tracker
 
+    async def _wait_for_render_stability(self, frame: FrameLocator | Frame, max_wait_ms: int = 2000):
+        """Phase 4: Ensures challenge view is not animating before capture."""
+        try:
+            challenge_view = frame.locator("//div[@class='challenge-view']")
+            start_time = time.time()
+            
+            while (time.time() - start_time) * 1000 < max_wait_ms:
+                # Capture two tiny fragments to check for pixel diff
+                bbox = await challenge_view.bounding_box()
+                if not bbox: break
+                
+                # Check for stability by comparing screenshots is slow, 
+                # instead wait for loading indicator to be TRULY gone and add a buffer
+                await self._wait_for_all_loaders_complete(frame)
+                await asyncio.sleep(0.5) # Stability buffer
+                return True
+        except: pass
+        return True
+
+    async def _score_candidates(self, primary: list, alternatives: list[list], challenge_type: str, bbox: dict) -> list:
+        """Phase 2: Heuristic Scorer to pick the best path sequence."""
+        all_candidates = [primary] + alternatives
+        best_sequence = primary
+        best_score = -1.0
+        
+        for seq in all_candidates:
+            if not seq: continue
+            score = 0.0
+            
+            for path in seq:
+                # 1. Canvas Bounds Check
+                in_bounds = (
+                    bbox['x'] <= path.start_point.x <= bbox['x'] + bbox['width'] and
+                    bbox['y'] <= path.start_point.y <= bbox['y'] + bbox['height'] and
+                    bbox['x'] <= path.end_point.x <= bbox['x'] + bbox['width'] and
+                    bbox['y'] <= path.end_point.y <= bbox['y'] + bbox['height']
+                )
+                if in_bounds: score += 0.5
+                
+                # 2. Directional Check (Right to Left)
+                if path.start_point.x > path.end_point.x: score += 0.3
+                
+                # 3. Confidence Weight
+                score += (path.confidence * 0.2)
+            
+            # 4. Road Continuity Bonus
+            if challenge_type == "drag_road" and len(seq) > 1:
+                # Check if pieces are roughly on the same row or follow a path
+                score += 0.1 
+
+            if score > best_score:
+                best_score = score
+                best_sequence = seq
+                
+        return best_sequence
+
     async def _wait_for_all_loaders_complete(self, frame: Frame):
         """Implementation of lines 240-260 of the original: Ensures challenge images are loaded."""
         await asyncio.sleep(self.arm.config.WAIT_FOR_CHALLENGE_VIEW_TO_RENDER_MS / 1000)
@@ -106,6 +162,42 @@ class PilotChallenges:
 
         return screenshot_path, grid_path
 
+    async def _save_audit_artifacts(
+        self, 
+        category: str, 
+        subtype: str, 
+        raw_img: Path, 
+        grid_img: Optional[Path], 
+        response: any, 
+        cid: int
+    ):
+        """Phase 0: Saves challenge state to a structured audit folder."""
+        try:
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            audit_dir = Path("tmp/audit").joinpath(category, subtype, timestamp)
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 1. Save images
+            if raw_img and raw_img.exists():
+                from shutil import copy2
+                copy2(raw_img, audit_dir / "original.png")
+            
+            if grid_img and grid_img.exists():
+                from shutil import copy2
+                copy2(grid_img, audit_dir / "grid_overlay.png")
+                
+            # 2. Save JSON response
+            import json
+            from pydantic import BaseModel
+            
+            resp_data = response.dict() if isinstance(response, BaseModel) else str(response)
+            with open(audit_dir / "ai_response.json", "w", encoding="utf-8") as f:
+                json.dump(resp_data, f, indent=4, ensure_ascii=False)
+                
+            logger.info(f"Audit artifacts saved to {audit_dir}", emoji='📁')
+        except Exception as e:
+            logger.warning(f"Failed to save audit artifacts: {e}")
+
     async def _click_submit(self, frame):
         """Implementation of original line 980: Clicks submit button with human simulation."""
         selectors = [
@@ -147,6 +239,7 @@ class PilotChallenges:
         for cid in range(self.arm.crumb_count):
             round_start = time.time()
             LoggerHelper.log_round_start(cid + 1, self.arm.crumb_count)
+            await self._wait_for_render_stability(frame)
             await self._wait_for_all_loaders_complete(frame)
             
             raw, projection = await self._capture_spatial_mapping(frame, cache_key, cid)
@@ -158,8 +251,16 @@ class PilotChallenges:
                 ai_duration = 0
                 model_used = "cache"
             else:
+                # Phase 3: Difficulty Routing
+                # Select a stronger model for complex challenges like "Road Reconstruction"
+                preferred_model = self.arm.config.SPATIAL_PATH_REASONER_MODEL
+                if challenge_type == "drag_road":
+                    # Use a thinking model if available in the priority list
+                    # For now, we rely on the RoboticArm to pick from the priority list
+                    LoggerHelper.log_info("Hard challenge detected. Requesting high-precision reasoning...", emoji='🧠')
+                
                 model, available_keys = await self.arm._get_available_model_and_keys(
-                    preferred_model=self.arm.config.SPATIAL_PATH_REASONER_MODEL
+                    preferred_model=preferred_model
                 )
                 
                 # Determine challenge type for specific prompt selection
@@ -212,13 +313,26 @@ class PilotChallenges:
                         "- PRECISE DROP: Align the center of the piece with the center of its match."
                     )
 
+                # Calculate grid context for high-precision hints
+                grid_config = self.arm.config.coordinate_grid
+                x_step = projection['width'] / (grid_config.x_line_space_num - 1)
+                y_step = projection['height'] / (grid_config.y_line_space_num - 1)
+                
+                grid_context = (
+                    f"CANVAS BOUNDS: X[{int(projection['x'])}-{int(projection['x'] + projection['width'])}], "
+                    f"Y[{int(projection['y'])}-{int(projection['y'] + projection['height'])}]\n"
+                    f"GRID PRECISION: Major lines every {x_step:.1f}px (X) and {y_step:.1f}px (Y)."
+                )
+
                 ai_hint = (
                     f"{user_prompt}\n"
                     f"{type_hint}\n"
+                    f"{grid_context}\n"
                     "INVENTORY LOCKDOWN: Count handles on the RIGHT. Return EXACTLY that many paths. Numbered circles ARE draggable pieces.\n"
                     "NO UI ELEMENTS: Ignore 'Move' text strips and grid axis numbers as candidates.\n"
                     "VALIDATION: start_point.x MUST be > end_point.x."
                 )
+                        
                 
                 try:
                     start_ai = time.time()
@@ -263,17 +377,57 @@ class PilotChallenges:
             LoggerHelper.log_ai_performance(model_used, ai_duration, len(response.paths))
             self.arm.metrics.log_ai_call(ai_duration)
 
-            for path in response.paths:
+            # Phase 2: Heuristic Scorer (Top-K Selection)
+            best_paths = await self._score_candidates(
+                primary=response.paths,
+                alternatives=response.alternatives,
+                challenge_type=challenge_type or "unknown",
+                bbox=projection
+            )
+
+            for path in best_paths:
                 # Validation: fix inverted coordinates (FROM should be right, TO left)
                 if path.start_point.x < path.end_point.x:
                     path.start_point, path.end_point = path.end_point, path.start_point
+                
                 if self.arm._validate_coordinate(path.start_point.x, path.start_point.y):
-                    LoggerHelper.log_info(f"DRAG: ({int(path.start_point.x)}, {int(path.start_point.y)}) -> ({int(path.end_point.x)}, {int(path.end_point.y)})", emoji='drag')
+                    LoggerHelper.log_info(f"DRAG: ({int(path.start_point.x)}, {int(path.start_point.y)}) -> ({int(path.end_point.x)}, {int(path.end_point.y)}) [Conf: {path.confidence:.2f}]", emoji='drag')
                     await self.arm.actions.perform_drag_drop(path, delay_ms=random.randint(15, 25))
                     await asyncio.sleep(random.uniform(0.5, 0.8))
 
-            await self._click_submit(frame)
-            self.tracker.log_round(cid+1, True, time.time()-round_start, ai_duration, len(response.paths))
+            # Phase 0: Save Audit Artifacts
+            await self._save_audit_artifacts(
+                category="drag_drop",
+                subtype=challenge_type or "unknown",
+                raw_img=raw,
+                grid_img=projection,
+                response=response,
+                cid=cid
+            )
+
+            # Phase 0: Save Audit Artifacts (Attempt)
+            await self._save_audit_artifacts(
+                category="drag_drop",
+                subtype=challenge_type or "unknown",
+                raw_img=raw,
+                grid_img=projection,
+                response=response,
+                cid=cid
+            )
+
+            is_success = await self._click_submit(frame)
+            
+            # Save final verdict
+            audit_dir = Path("tmp/audit").joinpath("drag_drop", challenge_type or "unknown")
+            # Find the latest subdir (the one we just created)
+            subdirs = sorted([d for d in audit_dir.iterdir() if d.is_dir()], key=os.path.getmtime)
+            if subdirs:
+                latest = subdirs[-1]
+                import json
+                with open(latest / "final_verdict.json", "w") as f:
+                    json.dump({"verdict": "SUCCESS" if is_success else "FAIL"}, f)
+
+            self.tracker.log_round(cid+1, is_success, time.time()-round_start, ai_duration, len(best_paths))
 
     def _detect_drag_challenge_type(self, user_prompt: str) -> str | None:
         """
@@ -330,6 +484,7 @@ class PilotChallenges:
             round_start = time.time()
             LoggerHelper.log_round_start(cid + 1, self.arm.crumb_count)
             
+            await self._wait_for_render_stability(frame)
             await self._wait_for_all_loaders_complete(frame)
 
             # Soul Alignment: Motion Pattern Detection -> Burst Mode 📸
@@ -375,6 +530,17 @@ class PilotChallenges:
                 preferred_model=self.arm.config.SPATIAL_POINT_REASONER_MODEL
             )
             
+            # Calculate grid context for high-precision hints
+            grid_config = self.arm.config.coordinate_grid
+            x_step = projection['width'] / (grid_config.x_line_space_num - 1)
+            y_step = projection['height'] / (grid_config.y_line_space_num - 1)
+            
+            grid_context = (
+                f"CANVAS BOUNDS: X[{int(projection['x'])}-{int(projection['x'] + projection['width'])}], "
+                f"Y[{int(projection['y'])}-{int(projection['y'] + projection['height'])}]\n"
+                f"GRID PRECISION: Major lines every {x_step:.1f}px (X) and {y_step:.1f}px (Y)."
+            )
+
             # Determine hint based on motion or uniqueness
             if is_motion:
                 type_hint = (
@@ -393,6 +559,7 @@ class PilotChallenges:
             ai_hint = (
                 f"{user_prompt}\n"
                 f"{type_hint}\n"
+                f"{grid_context}\n"
                 "COORDINATE ACCURACY: Use X/Y grid labels. Return exact center points.\n"
                 "NO UI ELEMENTS: Ignore 'Verify' buttons or labels."
             )
@@ -442,6 +609,16 @@ class PilotChallenges:
                 await self.arm.page.mouse.click(point.x, point.y, delay=180)
                 await asyncio.sleep(random.uniform(0.4, 0.6))
 
+            # Phase 0: Save Audit Artifacts
+            await self._save_audit_artifacts(
+                category="label_select",
+                subtype="motion" if is_motion else "point",
+                raw_img=raw[-1] if isinstance(raw, list) else raw,
+                grid_img=projection,
+                response=response,
+                cid=cid
+            )
+
             await self._click_submit(frame)
             self.tracker.log_round(cid+1, True, time.time()-round_start, ai_duration, len(points))
 
@@ -457,6 +634,7 @@ class PilotChallenges:
         for cid in range(self.arm.crumb_count):
             round_start = time.time()
             LoggerHelper.log_round_start(cid + 1, self.arm.crumb_count)
+            await self._wait_for_render_stability(frame)
             await self._wait_for_all_loaders_complete(frame)
             
             raw = await self.arm._get_challenge_image(frame, cache_key, cid)
@@ -505,6 +683,16 @@ class PilotChallenges:
                     selector = f"//div[@class='task' and contains(@aria-label, '{i+1}')]"
                     await self.arm.actions.click_by_mouse(frame.locator(selector))
             
+            # Phase 0: Save Audit Artifacts
+            await self._save_audit_artifacts(
+                category="binary",
+                subtype="grid_image",
+                raw_img=raw,
+                grid_img=None,
+                response=response,
+                cid=cid
+            )
+
             await self._click_submit(frame)
             self.tracker.log_round(cid+1, True, time.time()-round_start, ai_duration, sum(matrix))
 

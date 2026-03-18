@@ -77,6 +77,11 @@ def _create_adaptive_contrast_grid(
     ax.set_xticklabels([str(round(tick)) for tick in x_ticks], color=grid_color)
     ax.set_yticklabels([str(round(tick)) for tick in y_ticks], color=grid_color)
 
+    # Added: Highlight labels with a background for readability
+    label_bg = 'white' if grid_color == 'black' else 'black'
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_bbox(dict(facecolor=label_bg, alpha=0.4, edgecolor='none', pad=1))
+
     ax.grid(True, color=grid_color, alpha=0.7, linestyle='-', linewidth=1.0)
 
     n_colors = x_line_space_num * y_line_space_num
@@ -199,6 +204,10 @@ def create_coordinate_grid(
     # Format tick labels as rounded integers
     ax.set_xticklabels([str(round(tick)) for tick in x_ticks])
     ax.set_yticklabels([str(round(tick)) for tick in y_ticks])
+
+    # Added: Highlight labels with a background for readability
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_bbox(dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1))
 
     # Add grid with semi-transparent purple lines
     ax.grid(True, color=color, alpha=0.5, linestyle='-', linewidth=1.0)

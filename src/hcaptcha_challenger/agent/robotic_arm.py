@@ -102,8 +102,9 @@ class RoboticArm:
         if is_groq:
             model_priority = list(GROQ_MODEL_PRIORITY)
         else:
-            # Model priority (lighter first to ensure speed)
+            # Model priority (Robotics first for spatial precision)
             model_priority = [
+                "gemini-robotics-er-1.5-preview",
                 "gemini-3.1-flash-lite-preview",
                 "gemini-2.5-flash",
                 "gemini-2.5-flash-lite",
