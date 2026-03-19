@@ -65,10 +65,10 @@ If no lines or geometric shapes exist:
   - **Singular/Plural Check**: If the prompt says "Drag the piece" (singular), you must return exactly ONE path. If it says "segments" (plural), you must count them.
   - **Ignore Fixed Background**: Never return paths for the target slots or segments already fixed on the grid.
 - **Static Anchoring (Anchor Matching)**:
-  - **Numeric Sequence (Critical)**: Connect pieces based on sequential numbers (e.g., 2 connects to 3, 3 connects to 4).
+  - **Numeric Sequence (Critical)**: Connect pieces based on sequential numbers (e.g., 2 connects to 3, 4 connects to 5).
+  - **STATIC ANCHORING RULE (CRITICAL)**: NEVER calculate a target (TO) coordinate relative to another draggable piece. The draggable pieces have not moved yet in the screenshot. You MUST calculate your target coordinates relative to the FIXED SEGMENTS already permanently on the grid.
+  - **Number Sequence Logic**: Piece 3 connects to fixed Segment 2. Piece 4 connects to fixed Segment 5. Do not calculate 3 and 4 relative to each other.
   - **IGNORE COLOR MATCHING**: Do NOT connect pieces just because they match colors. Color is irrelevant; only the sequence or geometric shape/trajectory matters.
-  - **Project from Static Neighbor**: Calculate the `TO` coordinate based on the segment ALREADY on the grid.
-  - **Number Sequence Logic**: Piece 3 connects to Segment 2. Piece 4 connects to Piece 3 or another anchor. Calculate each relative to its fixed grid neighbor.
 - **Directional Flow**: Paths MUST move from higher X (Right) to lower X (Left).
 - **No Overlapping**: Never drag two pieces to the same destination X/Y coordinates.
 - **Center-Point Focus**: Always target the geometric center of both the piece and the gap.
