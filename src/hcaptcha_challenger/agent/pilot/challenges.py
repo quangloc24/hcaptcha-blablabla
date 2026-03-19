@@ -469,7 +469,12 @@ class PilotChallenges:
             LoggerHelper.log_info("Detected drag type: drag_connection (Color-based connection)", emoji='🎯')
             return "drag_connection"
         
-        # 3. drag_halves: Complementary Shapes / Completing the unit
+        # 3. drag_gear: Gear/Teeth matching
+        if "gear" in prompt_lower:
+            LoggerHelper.log_info("Detected drag type: drag_gear (Gear Assembly)", emoji='⚙️')
+            return "drag_gear"
+            
+        # 4. drag_halves: Complementary Shapes / Completing the unit
         if any(k in prompt_lower for k in ["half", "shape", "complete the", "complementary"]):
             LoggerHelper.log_info("Detected drag type: drag_halves (Geometric Matching)", emoji='🧩')
             return "drag_halves"

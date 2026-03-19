@@ -21,6 +21,7 @@ PATH_PROMPTS = {
     "drag_connection": "path_drag_connection.md",
     "drag_fit": "path_drag_fit.md",
     "drag_road": "path_drag_road.md",
+    "drag_gear": "path_drag_gear.md",
     "drag_halves": "path_drag_halves.md",
 }
 
