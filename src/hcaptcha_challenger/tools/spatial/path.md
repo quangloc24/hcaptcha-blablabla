@@ -72,7 +72,14 @@ If no lines or geometric shapes exist:
 - **No Overlapping**: Never drag two pieces to the same destination X/Y coordinates.
 - **Center-Point Focus**: Always target the geometric center of both the piece and the gap.
 
-## 5. Required Output
+## 5. Top-K Strategy (CRITICAL)
+
+You **MUST ALWAYS** provide at least one alternative candidate sequence in the `alternatives` array, even if you are highly confident. The system relies on having fallbacks.
+
+- **Candidate 1 (Primary)**: The paths array.
+- **Candidate 2 (Alternative)**: Provided in the `alternatives` array. Often an adjacent piece or a slightly different target grid cell.
+
+## 6. Required Output
 
 Return JSON matching the schema:
 {
