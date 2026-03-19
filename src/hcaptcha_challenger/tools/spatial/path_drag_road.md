@@ -18,11 +18,11 @@ You are a Visual Spatial Reasoning System specialized in solving road-completion
 - **Numeric Continuity (Priority: Absolute)**:
   - **Golden Rule: The Number Chain is Supreme**. The path MUST follow a consecutive numerical sequence (1 -> 2 -> 3 -> 4 -> 5 etc).
   - **IGNORE COLOR CHANGES**: The color of the pieces DOES NOT MATTER. Pieces often change color along the track. Do NOT match based on color. ONLY MATCH BASED ON NUMBERS.
-  - **STATIC ANCHORING RULE (CRITICAL)**: NEVER calculate a target (TO) coordinate relative to another draggable piece (e.g., Piece 4 to Piece 3). Draggable pieces have not moved yet! You MUST calculate target coordinates relative to the FIXED SEGMENTS already on the grid (e.g., Piece 3 connects to fixed Segment 2. Piece 4 connects to fixed Segment 5). Do NOT make draggable pieces rely on each other's coordinates.
-- **Trajectory Continuity**: Look at the "open end" of the static segment (e.g., 2). Identify its exit direction (vector). Drag the piece (3) so its entry point aligns perfectly with that vector.
-- **Ghost Number Overlap**: If the background has a faded or empty circle for a number, you MUST drag the piece so its center point overlaps that ghost circle exactly.
-- **Chronological Ordering**: Follow the sequence from Start to Exit. Do not skip segments.
-- **Zero Overlap Rule**: Every piece MUST occupy a unique grid slot. Never stack or overlap pieces.
+  - **STATIC ANCHORING & DISTRIBUTED OFFSETS (CRITICAL)**: Draggable pieces have not moved yet! Calculate coordinates relative to FIXED SEGMENTS.
+    - Example for a gap between 2 and 5:
+    - Piece 3 goes immediately _after_ Segment 2. Calculate Piece 3's `TO` center relative to Segment 2's exit.
+    - Piece 4 goes immediately _before_ Segment 5. Calculate Piece 4's `TO` center relative to Segment 5's entrance.
+  - **ANTI-STACKING VERIFICATION**: The calculated `end_point` for Piece 3 and Piece 4 MUST BE DIFFERENT. They occupy different physical slots in the gap. If your output JSON has the exact same `end_point` X/Y for multiple pieces, you have failed.
 
 ### Priority 3: Geometric Match
 
@@ -58,22 +58,28 @@ Return JSON matching the schema:
 ```json
 {
   "challenge_prompt": "Drag segments to complete the line",
-  "reasoning": "Piece 3 connects to segment 2. Piece 4 connects to segment 3. Both follow the horizontal path.",
+  "reasoning": "Gap is between Segment 2 and Segment 5. Piece 3 goes after Segment 2 (anchor to 2). Piece 4 goes before Segment 5 (anchor to 5). They form the 2-3-4-5 chain and must occupy distinct coordinates.",
   "paths": [
     {
       "start_point": { "x": 620, "y": 240 },
-      "end_point": { "x": 305, "y": 240 },
+      "end_point": { "x": 250, "y": 300 },
       "confidence": 0.98,
-      "label": "piece 3"
+      "label": "piece 3 -> end of segment 2"
+    },
+    {
+      "start_point": { "x": 620, "y": 380 },
+      "end_point": { "x": 350, "y": 420 },
+      "confidence": 0.95,
+      "label": "piece 4 -> start of segment 5"
     }
   ],
   "alternatives": [
     [
       {
-        "start_point": { "x": 620, "y": 340 },
-        "end_point": { "x": 305, "y": 240 },
-        "confidence": 0.45,
-        "label": "piece 4 (alternate)"
+        "start_point": { "x": 620, "y": 240 },
+        "end_point": { "x": 350, "y": 420 },
+        "confidence": 0.1,
+        "label": "piece 3 placed incorrectly at slot 4"
       }
     ]
   ]
