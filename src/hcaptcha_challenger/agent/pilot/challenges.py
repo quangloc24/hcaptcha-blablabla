@@ -401,8 +401,13 @@ class PilotChallenges:
 
             # Capture Post-Action Screenshot
             post_action_img = cache_key.joinpath(f"{cache_key.name}_{cid}_post_action.png")
-            challenge_view = frame.locator("//div[@class='challenge-view']")
-            await challenge_view.screenshot(type="png", path=post_action_img, timeout=5000)
+            try:
+                post_action_img.parent.mkdir(parents=True, exist_ok=True)
+                challenge_view = frame.locator("//div[@class='challenge-view']")
+                await challenge_view.screenshot(type="png", path=post_action_img, timeout=5000)
+            except Exception as e:
+                LoggerHelper.log_debug(f"Failed to capture post-action screenshot: {e}")
+                post_action_img = None
 
             # Phase 0: Save Audit Artifacts
             await self._save_audit_artifacts(
