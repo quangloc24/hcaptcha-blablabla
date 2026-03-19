@@ -62,6 +62,11 @@ class AgentConfig(BaseSettings):
         description="Default SCoT model for various tasks"
     )
 
+    DEBUG_MODE: bool = Field(
+        default=False,
+        description="When enabled, saves challenge states, screenshots, and JSON responses to the audit directory."
+    )
+
     DISABLE_BEZIER_TRAJECTORY: bool = Field(
         default=False,
         description="If you use Camoufox, it is recommended to turn off "

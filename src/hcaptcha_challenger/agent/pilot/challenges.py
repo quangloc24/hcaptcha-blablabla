@@ -166,20 +166,37 @@ class PilotChallenges:
         self, 
         category: str, 
         subtype: str, 
-        raw_img: Path, 
+        raw_img: Union[Path, list[Path]], 
         grid_img: Optional[Path], 
         response: any, 
         cid: int,
         post_action_img: Optional[Path] = None
     ):
         """Phase 0: Saves challenge state to a structured audit folder."""
+        if not self.arm.config.DEBUG_MODE:
+            return
+            
         try:
             timestamp = time.strftime("%Y%m%d-%H%M%S")
             audit_dir = self.arm.config.audit_dir.joinpath(category, subtype, timestamp)
             audit_dir.mkdir(parents=True, exist_ok=True)
             
             # 1. Save images
-            if raw_img and raw_img.exists():
+            if isinstance(raw_img, list) and len(raw_img) > 0:
+                # Burst mode: Generate GIF
+                try:
+                    from PIL import Image
+                    frames = [Image.open(p) for p in raw_img if p.exists()]
+                    if frames:
+                        frames[0].save(
+                            audit_dir / "original_burst.gif",
+                            save_all=True,
+                            append_images=frames[1:],
+                            duration=200, loop=0
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to save burst GIF: {e}")
+            elif raw_img and raw_img.exists():
                 from shutil import copy2
                 copy2(raw_img, audit_dir / "original.png")
             
@@ -615,14 +632,25 @@ class PilotChallenges:
                 await self.arm.page.mouse.click(point.x, point.y, delay=180)
                 await asyncio.sleep(random.uniform(0.4, 0.6))
 
+            # Capture Post-Action Screenshot
+            post_action_img = cache_key.joinpath(f"{cache_key.name}_{cid}_post_action.png")
+            try:
+                post_action_img.parent.mkdir(parents=True, exist_ok=True)
+                challenge_view = frame.locator("//div[@class='challenge-view']")
+                await challenge_view.screenshot(type="png", path=post_action_img, timeout=5000)
+            except Exception as e:
+                LoggerHelper.log_debug(f"Failed to capture post-action screenshot: {e}")
+                post_action_img = None
+
             # Phase 0: Save Audit Artifacts
             await self._save_audit_artifacts(
                 category="label_select",
                 subtype="motion" if is_motion else "point",
-                raw_img=raw[-1] if isinstance(raw, list) else raw,
+                raw_img=raw,
                 grid_img=projection,
                 response=response,
-                cid=cid
+                cid=cid,
+                post_action_img=post_action_img
             )
 
             await self._click_submit(frame)
@@ -689,6 +717,16 @@ class PilotChallenges:
                     selector = f"//div[@class='task' and contains(@aria-label, '{i+1}')]"
                     await self.arm.actions.click_by_mouse(frame.locator(selector))
             
+            # Capture Post-Action Screenshot
+            post_action_img = cache_key.joinpath(f"{cache_key.name}_{cid}_post_action.png")
+            try:
+                post_action_img.parent.mkdir(parents=True, exist_ok=True)
+                challenge_view = frame.locator("//div[@class='challenge-view']")
+                await challenge_view.screenshot(type="png", path=post_action_img, timeout=5000)
+            except Exception as e:
+                LoggerHelper.log_debug(f"Failed to capture post-action screenshot: {e}")
+                post_action_img = None
+
             # Phase 0: Save Audit Artifacts
             await self._save_audit_artifacts(
                 category="binary",
@@ -696,7 +734,8 @@ class PilotChallenges:
                 raw_img=raw,
                 grid_img=None,
                 response=response,
-                cid=cid
+                cid=cid,
+                post_action_img=post_action_img
             )
 
             await self._click_submit(frame)
