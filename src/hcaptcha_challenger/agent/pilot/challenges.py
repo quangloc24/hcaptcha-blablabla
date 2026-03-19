@@ -169,7 +169,8 @@ class PilotChallenges:
         raw_img: Path, 
         grid_img: Optional[Path], 
         response: any, 
-        cid: int
+        cid: int,
+        post_action_img: Optional[Path] = None
     ):
         """Phase 0: Saves challenge state to a structured audit folder."""
         try:
@@ -185,6 +186,10 @@ class PilotChallenges:
             if grid_img and grid_img.exists():
                 from shutil import copy2
                 copy2(grid_img, audit_dir / "grid_overlay.png")
+                
+            if post_action_img and post_action_img.exists():
+                from shutil import copy2
+                copy2(post_action_img, audit_dir / "post_action.png")
                 
             # 2. Save JSON response
             import json
@@ -394,6 +399,11 @@ class PilotChallenges:
                     await self.arm.actions.perform_drag_drop(path, delay_ms=random.randint(15, 25))
                     await asyncio.sleep(random.uniform(0.5, 0.8))
 
+            # Capture Post-Action Screenshot
+            post_action_img = cache_key.joinpath(f"{cache_key.name}_{cid}_post_action.png")
+            challenge_view = frame.locator("//div[@class='challenge-view']")
+            await challenge_view.screenshot(type="png", path=post_action_img, timeout=5000)
+
             # Phase 0: Save Audit Artifacts
             await self._save_audit_artifacts(
                 category="drag_drop",
@@ -401,17 +411,8 @@ class PilotChallenges:
                 raw_img=raw,
                 grid_img=projection,
                 response=response,
-                cid=cid
-            )
-
-            # Phase 0: Save Audit Artifacts (Attempt)
-            await self._save_audit_artifacts(
-                category="drag_drop",
-                subtype=challenge_type or "unknown",
-                raw_img=raw,
-                grid_img=projection,
-                response=response,
-                cid=cid
+                cid=cid,
+                post_action_img=post_action_img
             )
 
             is_success = await self._click_submit(frame)
